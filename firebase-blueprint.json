@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "phone", "address"]
+    },
+    "Driver": {
+      "title": "Driver",
+      "description": "Driver/Rider entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "vehicle": { "type": "string" },
+        "status": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "ServiceItem": {
+      "title": "ServiceItem",
+      "description": "Service item entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "price": { "type": "number" }
+      },
+      "required": ["id", "name", "price"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Laundry order entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "deliveryAddress": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "pickupDriverId": { "type": "string" },
+        "deliveryDriverId": { "type": "string" },
+        "scheduledPickup": { "type": "string" },
+        "scheduledDelivery": { "type": "string" },
+        "notes": { "type": "string" },
+        "proofOfDelivery": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "customerId", "totalAmount", "status"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment record entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "reference": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "orderId", "amount", "method"]
+    }
+  },
+  "firestore": {
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customers collection"
+    },
+    "/drivers/{driverId}": {
+      "schema": "Driver",
+      "description": "Drivers collection"
+    },
+    "/services/{serviceId}": {
+      "schema": "ServiceItem",
+      "description": "Services collection"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Orders collection"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payments collection"
+    }
+  }
+}

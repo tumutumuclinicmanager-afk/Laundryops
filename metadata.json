@@ -1,0 +1,7 @@
+{
+  "name": "LaundryOps Manager",
+  "description": "Internal operations and financials manager for pickup & delivery laundry services",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

@@ -1,6 +1,6 @@
 {
   "name": "LaundryOps Manager",
-  "description": "Internal operations and financials manager for pickup & delivery laundry services",
+  "description": "Pickup & delivery laundry management platform with doorstep customer booking portal, operational logistics, driver route dispatch, and customer reviews",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

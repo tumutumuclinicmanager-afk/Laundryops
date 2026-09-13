@@ -102,3 +102,13 @@ export interface Reports {
   revenueByMethod: Record<string, number>;
   customersCount: number;
 }
+
+export interface Review {
+  id: string;
+  customerName: string;
+  rating: number;
+  comment: string;
+  serviceUsed?: string;
+  date: string;
+  verified?: boolean;
+}

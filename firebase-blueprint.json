@@ -79,6 +79,21 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "orderId", "amount", "method"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Customer feedback and review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "serviceUsed": { "type": "string" },
+        "date": { "type": "string" },
+        "verified": { "type": "boolean" }
+      },
+      "required": ["id", "customerName", "rating", "comment"]
     }
   },
   "firestore": {
@@ -101,6 +116,10 @@
     "/payments/{paymentId}": {
       "schema": "Payment",
       "description": "Payments collection"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Customer reviews and testimonials collection"
     }
   }
 }

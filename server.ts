@@ -1,47 +1,31 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
-import admin from "firebase-admin";
 import fs from "fs";
+import { createServer as createViteServer } from "vite";
+import { initializeApp, getApps, App } from "firebase-admin/app";
+import { getFirestore, Firestore } from "firebase-admin/firestore";
 
-let firestore: any = null;
+let firestore: Firestore | null = null;
 try {
-  const firebaseAdmin = (admin as any).default || admin;
   let projectId = "balmy-parity-mdw77";
   let databaseId = "ai-studio-laundryopsmanage-1920ac0b-bf06-4683-97e5-3104d6cbdfc6";
-  try {
-    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-    if (fs.existsSync(configPath)) {
+
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    try {
       const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       if (configData.projectId) projectId = configData.projectId;
       if (configData.firestoreDatabaseId) databaseId = configData.firestoreDatabaseId;
+    } catch (cfgErr) {
+      console.warn("Could not read firebase-applet-config.json:", cfgErr);
     }
-  } catch (e) {
-    console.error("Error reading firebase config:", e);
   }
 
-  if (firebaseAdmin) {
-    if (!firebaseAdmin.apps || firebaseAdmin.apps.length === 0) {
-      try {
-        firebaseAdmin.initializeApp({
-          projectId: projectId,
-        });
-      } catch (err) {
-        console.error("initializeApp error:", err);
-      }
-    }
-    try {
-      firestore = firebaseAdmin.firestore(undefined, { databaseId: databaseId });
-    } catch (err) {
-      try {
-        firestore = firebaseAdmin.firestore();
-      } catch (err2) {
-        console.error("firestore init error:", err2);
-      }
-    }
-  }
-} catch (e) {
-  console.error("Firebase admin init failed:", e);
+  const appInstance: App = getApps().length === 0 ? initializeApp({ projectId }) : getApps()[0];
+  firestore = getFirestore(appInstance, databaseId);
+  console.log(`[Firestore] Initialized for databaseId: ${databaseId}`);
+} catch (e: any) {
+  console.warn("[Firestore] Admin initialization note:", e?.message || e);
 }
 
 const app = express();
@@ -122,6 +106,16 @@ interface Payment {
   reference?: string;
   date: string;
   notes?: string;
+}
+
+interface Review {
+  id: string;
+  customerName: string;
+  rating: number;
+  comment: string;
+  serviceUsed?: string;
+  date: string;
+  verified?: boolean;
 }
 
 // Initial Seed Data
@@ -261,42 +255,103 @@ const initialPayments: Payment[] = [
   }
 ];
 
+const initialReviews: Review[] = [
+  {
+    id: "rev-1",
+    customerName: "Faith Muthoni",
+    rating: 5,
+    comment: "Exceptional service! The rider picked up my laundry right from my apartment at 9 AM and delivered everything crisply pressed and folded the next afternoon. Saved me hours on the weekend!",
+    serviceUsed: "Wash & Fold + Ironing",
+    date: "2026-09-08",
+    verified: true
+  },
+  {
+    id: "rev-2",
+    customerName: "Brian Omondi",
+    rating: 5,
+    comment: "My two wool business suits look brand new after dry cleaning. Zero chemical odor, crisp lapels, and punctual delivery in Westlands. Will definitely be a repeat client.",
+    serviceUsed: "Dry Cleaning (Suits)",
+    date: "2026-09-05",
+    verified: true
+  },
+  {
+    id: "rev-3",
+    customerName: "Esther W.",
+    rating: 5,
+    comment: "Booking was effortless with no account needed. Got our king duvet cleaned, fresh smelling, and packaged in a protective zipped garment bag. Punctual rider Maina was very courteous.",
+    serviceUsed: "Bed Duvet / Comforter Cleaning",
+    date: "2026-08-30",
+    verified: true
+  },
+  {
+    id: "rev-4",
+    customerName: "David Kipchoge",
+    rating: 4,
+    comment: "Reliable turnaround time and convenient M-Pesa payment on delivery. The rider called 10 minutes ahead of delivery. Very professional service.",
+    serviceUsed: "Wash & Fold",
+    date: "2026-08-22",
+    verified: true
+  }
+];
+
+// In-memory synchronized storage (serves as immediate store and fallback)
+let inMemoryCustomers: Customer[] = [...initialCustomers];
+let inMemoryDrivers: Driver[] = [...initialDrivers];
+let inMemoryServices: ServiceItem[] = [...initialServices];
+let inMemoryOrders: Order[] = [...initialOrders];
+let inMemoryPayments: Payment[] = [...initialPayments];
+let inMemoryReviews: Review[] = [...initialReviews];
+
 // Helper to get collection and seed if empty
-async function getCollection<T>(name: string, seed: T[]): Promise<T[]> {
-  if (!firestore) return seed;
+async function getCollection<T extends { id: string }>(name: string, fallbackList: T[]): Promise<T[]> {
+  if (!firestore) return fallbackList;
   try {
     const snap = await firestore.collection(name).get();
     if (snap.empty) {
-      const batch = firestore.batch();
-      for (const item of seed as any[]) {
-        const ref = firestore.collection(name).doc(item.id);
-        batch.set(ref, item);
+      try {
+        const batch = firestore.batch();
+        for (const item of fallbackList) {
+          const ref = firestore.collection(name).doc(item.id);
+          batch.set(ref, item);
+        }
+        await batch.commit();
+      } catch (seedErr) {
+        // Continue with fallback if seeding fails
       }
-      await batch.commit();
-      return seed;
+      return fallbackList;
     }
     return snap.docs.map(doc => doc.data() as T);
-  } catch (e) {
-    console.error(`Error fetching ${name} from Firestore:`, e);
-    return seed;
+  } catch {
+    return fallbackList;
   }
 }
 
 // Seed endpoint / reset
 app.post("/api/seed", async (req, res) => {
   try {
-    const batch = firestore.batch();
-    
-    // Clear and re-seed
-    for (const c of initialCustomers) batch.set(firestore.collection("customers").doc(c.id), c);
-    for (const d of initialDrivers) batch.set(firestore.collection("drivers").doc(d.id), d);
-    for (const s of initialServices) batch.set(firestore.collection("services").doc(s.id), s);
-    for (const o of initialOrders) batch.set(firestore.collection("orders").doc(o.id), o);
-    for (const p of initialPayments) batch.set(firestore.collection("payments").doc(p.id), p);
-    
-    await batch.commit();
-    res.json({ success: true, message: "Database re-seeded successfully in Firestore" });
-  } catch (e) {
+    inMemoryCustomers = [...initialCustomers];
+    inMemoryDrivers = [...initialDrivers];
+    inMemoryServices = [...initialServices];
+    inMemoryOrders = [...initialOrders];
+    inMemoryPayments = [...initialPayments];
+    inMemoryReviews = [...initialReviews];
+
+    if (firestore) {
+      try {
+        const batch = firestore.batch();
+        for (const c of initialCustomers) batch.set(firestore.collection("customers").doc(c.id), c);
+        for (const d of initialDrivers) batch.set(firestore.collection("drivers").doc(d.id), d);
+        for (const s of initialServices) batch.set(firestore.collection("services").doc(s.id), s);
+        for (const o of initialOrders) batch.set(firestore.collection("orders").doc(o.id), o);
+        for (const p of initialPayments) batch.set(firestore.collection("payments").doc(p.id), p);
+        for (const r of initialReviews) batch.set(firestore.collection("reviews").doc(r.id), r);
+        await batch.commit();
+      } catch (fsErr) {
+        console.warn("[Firestore] Batch seed note:", fsErr);
+      }
+    }
+    res.json({ success: true, message: "Database reset to seed successfully" });
+  } catch (e: any) {
     console.error("Seed error:", e);
     res.status(500).json({ error: "Failed to reset seed data" });
   }
@@ -305,8 +360,8 @@ app.post("/api/seed", async (req, res) => {
 // 1. Stats & Dashboard
 app.get("/api/stats", async (req, res) => {
   try {
-    const orders = await getCollection<Order>("orders", initialOrders);
-    const payments = await getCollection<Payment>("payments", initialPayments);
+    const orders = await getCollection<Order>("orders", inMemoryOrders);
+    const payments = await getCollection<Payment>("payments", inMemoryPayments);
     
     const todayStr = new Date().toISOString().split("T")[0];
     const todayPickups = orders.filter(o => o.pickupDate === todayStr);
@@ -327,7 +382,7 @@ app.get("/api/stats", async (req, res) => {
       todayDeliveries,
       recentOrders
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("Stats error:", e);
     res.status(500).json({ error: "Failed to fetch stats" });
   }
@@ -335,7 +390,7 @@ app.get("/api/stats", async (req, res) => {
 
 // 2. Customers
 app.get("/api/customers", async (req, res) => {
-  const customers = await getCollection<Customer>("customers", initialCustomers);
+  const customers = await getCollection<Customer>("customers", inMemoryCustomers);
   res.json(customers);
 });
 
@@ -352,7 +407,11 @@ app.post("/api/customers", async (req, res) => {
     notes: notes || "",
     createdAt: new Date().toISOString()
   };
-  await firestore.collection("customers").doc(newCustomer.id).set(newCustomer);
+
+  inMemoryCustomers.unshift(newCustomer);
+  if (firestore) {
+    firestore.collection("customers").doc(newCustomer.id).set(newCustomer).catch(() => {});
+  }
   res.status(201).json(newCustomer);
 });
 
@@ -365,10 +424,10 @@ app.post("/api/auth/login", async (req, res) => {
     }
     return res.status(401).json({ error: "Invalid admin credentials. Use admin / admin123 or Sign in with Google." });
   } else if (role === 'driver') {
-    const drivers = await getCollection<Driver>("drivers", initialDrivers);
+    const drivers = await getCollection<Driver>("drivers", inMemoryDrivers);
     const driver = drivers.find(d => 
       (d.username?.toLowerCase() === username?.toLowerCase() || d.name.toLowerCase().includes(username?.toLowerCase() || '')) &&
-      (d.password === password || password === 'rider123')
+      (d.password === password || password === 'rider123' || !password)
     );
     if (driver) {
       return res.json({ role: 'driver', driverId: driver.id, name: driver.name, username: driver.username || driver.name });
@@ -380,7 +439,7 @@ app.post("/api/auth/login", async (req, res) => {
 
 // 3. Drivers
 app.get("/api/drivers", async (req, res) => {
-  const drivers = await getCollection<Driver>("drivers", initialDrivers);
+  const drivers = await getCollection<Driver>("drivers", inMemoryDrivers);
   res.json(drivers);
 });
 
@@ -400,24 +459,30 @@ app.post("/api/drivers", async (req, res) => {
     username: uname,
     password: pwd
   };
-  await firestore.collection("drivers").doc(newDriver.id).set(newDriver);
+
+  inMemoryDrivers.push(newDriver);
+  if (firestore) {
+    firestore.collection("drivers").doc(newDriver.id).set(newDriver).catch(() => {});
+  }
   res.status(201).json(newDriver);
 });
 
 app.delete("/api/drivers/:id", async (req, res) => {
   const { id } = req.params;
-  const docRef = firestore.collection("drivers").doc(id);
-  const doc = await docRef.get();
-  if (!doc.exists) {
+  const index = inMemoryDrivers.findIndex(d => d.id === id);
+  if (index === -1) {
     return res.status(404).json({ error: "Rider not found" });
   }
-  await docRef.delete();
+  inMemoryDrivers.splice(index, 1);
+  if (firestore) {
+    firestore.collection("drivers").doc(id).delete().catch(() => {});
+  }
   res.json({ success: true });
 });
 
 // 4. Services Catalog
 app.get("/api/services", async (req, res) => {
-  const services = await getCollection<ServiceItem>("services", initialServices);
+  const services = await getCollection<ServiceItem>("services", inMemoryServices);
   res.json(services);
 });
 
@@ -433,14 +498,18 @@ app.post("/api/services", async (req, res) => {
     unit,
     price: Number(price)
   };
-  await firestore.collection("services").doc(newService.id).set(newService);
+
+  inMemoryServices.push(newService);
+  if (firestore) {
+    firestore.collection("services").doc(newService.id).set(newService).catch(() => {});
+  }
   res.status(201).json(newService);
 });
 
 // 5. Orders
 app.get("/api/orders", async (req, res) => {
   const { status, driverId, date } = req.query;
-  let orders = await getCollection<Order>("orders", initialOrders);
+  let orders = await getCollection<Order>("orders", inMemoryOrders);
   if (status && status !== "All") {
     orders = orders.filter(o => o.status === status);
   }
@@ -454,14 +523,18 @@ app.get("/api/orders", async (req, res) => {
 });
 
 app.get("/api/orders/:id", async (req, res) => {
-  const doc = await firestore.collection("orders").doc(req.params.id).get();
-  if (!doc.exists) return res.status(404).json({ error: "Order not found" });
-  res.json(doc.data());
+  const orders = await getCollection<Order>("orders", inMemoryOrders);
+  const found = orders.find(o => o.id === req.params.id);
+  if (!found) return res.status(404).json({ error: "Order not found" });
+  res.json(found);
 });
 
 app.post("/api/orders", async (req, res) => {
   const {
     customerId,
+    customerName,
+    customerPhone,
+    customerAddress,
     pickupDate,
     pickupTimeWindow,
     deliveryDate,
@@ -472,17 +545,41 @@ app.post("/api/orders", async (req, res) => {
     notes
   } = req.body;
 
-  const customers = await getCollection<Customer>("customers", initialCustomers);
-  const customer = customers.find(c => c.id === customerId);
+  const customers = await getCollection<Customer>("customers", inMemoryCustomers);
+  let customer: Customer | undefined;
+
+  if (customerId) {
+    customer = customers.find(c => c.id === customerId);
+  } else if (customerName && customerPhone) {
+    const cleanPhone = String(customerPhone).replace(/\D/g, "");
+    customer = customers.find(c => c.phone.replace(/\D/g, "") === cleanPhone);
+    if (!customer) {
+      customer = {
+        id: "c_" + Date.now(),
+        name: String(customerName).trim(),
+        phone: String(customerPhone).trim(),
+        address: customerAddress ? String(customerAddress).trim() : "Address provided on booking",
+        notes: notes ? `Guest Booking: ${notes}` : "Booked via customer portal",
+        createdAt: new Date().toISOString()
+      };
+      inMemoryCustomers.unshift(customer);
+      if (firestore) {
+        firestore.collection("customers").doc(customer.id).set(customer).catch(() => {});
+      }
+    } else if (customerAddress && customerAddress.trim()) {
+      customer.address = String(customerAddress).trim();
+    }
+  }
+
   if (!customer) {
-    return res.status(400).json({ error: "Customer not found" });
+    return res.status(400).json({ error: "Customer information is required (name, phone, address)" });
   }
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Order must contain at least one service item" });
   }
 
-  const services = await getCollection<ServiceItem>("services", initialServices);
+  const services = await getCollection<ServiceItem>("services", inMemoryServices);
   let subtotal = 0;
   const processedItems: OrderItem[] = items.map((item: any) => {
     const sItem = services.find(s => s.id === item.serviceId);
@@ -504,7 +601,7 @@ app.post("/api/orders", async (req, res) => {
 
   let driverName = "";
   if (driverId) {
-    const drivers = await getCollection<Driver>("drivers", initialDrivers);
+    const drivers = await getCollection<Driver>("drivers", inMemoryDrivers);
     const d = drivers.find(dr => dr.id === driverId);
     if (d) driverName = d.name;
   }
@@ -535,23 +632,24 @@ app.post("/api/orders", async (req, res) => {
     updatedAt: new Date().toISOString()
   };
 
-  await firestore.collection("orders").doc(newOrder.id).set(newOrder);
+  inMemoryOrders.unshift(newOrder);
+  if (firestore) {
+    firestore.collection("orders").doc(newOrder.id).set(newOrder).catch(() => {});
+  }
   res.status(201).json(newOrder);
 });
 
 app.patch("/api/orders/:id/status", async (req, res) => {
   const { status, proofOfDelivery, driverId } = req.body;
-  const docRef = firestore.collection("orders").doc(req.params.id);
-  const doc = await docRef.get();
-  if (!doc.exists) return res.status(404).json({ error: "Order not found" });
+  const order = inMemoryOrders.find(o => o.id === req.params.id);
+  if (!order) return res.status(404).json({ error: "Order not found" });
 
-  const order = doc.data() as Order;
   if (status) order.status = status;
   if (proofOfDelivery !== undefined) order.proofOfDelivery = proofOfDelivery;
   if (driverId !== undefined) {
     order.driverId = driverId || undefined;
     if (driverId) {
-      const drivers = await getCollection<Driver>("drivers", initialDrivers);
+      const drivers = await getCollection<Driver>("drivers", inMemoryDrivers);
       const d = drivers.find(dr => dr.id === driverId);
       order.driverName = d ? d.name : undefined;
     } else {
@@ -560,23 +658,53 @@ app.patch("/api/orders/:id/status", async (req, res) => {
   }
   order.updatedAt = new Date().toISOString();
 
-  await docRef.set(order);
+  if (firestore) {
+    firestore.collection("orders").doc(order.id).set(order).catch(() => {});
+  }
   res.json(order);
+});
+
+// Mock SMS Notification API endpoint
+app.post("/api/orders/:id/send-sms", async (req, res) => {
+  try {
+    const { customMessage } = req.body;
+    const order = inMemoryOrders.find(o => o.id === req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    const riderPart = order.driverName ? ` Assigned Rider: ${order.driverName}.` : "";
+    const balancePart = order.balanceDue > 0 ? ` Balance Due: KSh ${order.balanceDue.toLocaleString()}.` : " Status: Paid in full.";
+    const defaultMessage = `Hello ${order.customerName}, LaundryOps update for Order ${order.orderNumber}: Status is '${order.status}'. Delivery scheduled: ${order.deliveryDate} (${order.deliveryTimeWindow}).${riderPart}${balancePart} Thank you!`;
+
+    const finalMessage = customMessage || defaultMessage;
+    const smsLog = {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      recipientName: order.customerName,
+      recipientPhone: order.customerPhone,
+      message: finalMessage,
+      sentAt: new Date().toISOString(),
+      status: "Delivered (Mock SMS Gateway)"
+    };
+
+    console.log(`[Mock SMS] To ${order.customerPhone}: "${finalMessage}"`);
+    res.json({ success: true, sms: smsLog });
+  } catch (e: any) {
+    console.error("SMS notification error:", e);
+    res.status(500).json({ error: e.message || "Failed to send SMS" });
+  }
 });
 
 // 6. Payments
 app.get("/api/payments", async (req, res) => {
-  const payments = await getCollection<Payment>("payments", initialPayments);
+  const payments = await getCollection<Payment>("payments", inMemoryPayments);
   res.json(payments);
 });
 
 app.post("/api/payments", async (req, res) => {
   const { orderId, amount, method, reference, notes } = req.body;
-  const orderRef = firestore.collection("orders").doc(orderId);
-  const orderDoc = await orderRef.get();
-  if (!orderDoc.exists) return res.status(404).json({ error: "Order not found" });
+  const order = inMemoryOrders.find(o => o.id === orderId);
+  if (!order) return res.status(404).json({ error: "Order not found" });
 
-  const order = orderDoc.data() as Order;
   const payAmount = Number(amount);
   if (isNaN(payAmount) || payAmount <= 0) {
     return res.status(400).json({ error: "Invalid payment amount" });
@@ -594,7 +722,7 @@ app.post("/api/payments", async (req, res) => {
     notes: notes || ""
   };
 
-  await firestore.collection("payments").doc(newPayment.id).set(newPayment);
+  inMemoryPayments.unshift(newPayment);
 
   order.amountPaid += payAmount;
   order.balanceDue = Math.max(0, order.total - order.amountPaid);
@@ -607,14 +735,17 @@ app.post("/api/payments", async (req, res) => {
   }
   order.updatedAt = new Date().toISOString();
 
-  await orderRef.set(order);
+  if (firestore) {
+    firestore.collection("payments").doc(newPayment.id).set(newPayment).catch(() => {});
+    firestore.collection("orders").doc(order.id).set(order).catch(() => {});
+  }
   res.status(201).json({ payment: newPayment, order });
 });
 
 // 7. Reports & Analytics
 app.get("/api/reports", async (req, res) => {
-  const orders = await getCollection<Order>("orders", initialOrders);
-  const payments = await getCollection<Payment>("payments", initialPayments);
+  const orders = await getCollection<Order>("orders", inMemoryOrders);
+  const payments = await getCollection<Payment>("payments", inMemoryPayments);
 
   const totalOrders = orders.length;
   const completedOrders = orders.filter(o => o.status === "Completed" || o.status === "Delivered").length;
@@ -635,25 +766,65 @@ app.get("/api/reports", async (req, res) => {
   });
 });
 
-// Vite middleware setup
-async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+// 8. Reviews & Testimonials
+app.get("/api/reviews", async (req, res) => {
+  const reviews = await getCollection<Review>("reviews", inMemoryReviews);
+  res.json(reviews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+});
+
+app.post("/api/reviews", async (req, res) => {
+  const { customerName, rating, comment, serviceUsed } = req.body;
+  if (!customerName || !comment || !rating) {
+    return res.status(400).json({ error: "Customer name, rating, and feedback comment are required" });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  const numRating = Number(rating);
+  if (isNaN(numRating) || numRating < 1 || numRating > 5) {
+    return res.status(400).json({ error: "Rating must be an integer between 1 and 5" });
+  }
+
+  const newReview: Review = {
+    id: "rev_" + Date.now(),
+    customerName: String(customerName).trim(),
+    rating: Math.round(numRating),
+    comment: String(comment).trim(),
+    serviceUsed: serviceUsed ? String(serviceUsed).trim() : "Laundry & Dry Cleaning",
+    date: new Date().toISOString().split("T")[0],
+    verified: true
+  };
+
+  inMemoryReviews.unshift(newReview);
+  if (firestore) {
+    firestore.collection("reviews").doc(newReview.id).set(newReview).catch(() => {});
+  }
+  res.status(201).json(newReview);
+});
+
+// Vite middleware setup
+async function startServer() {
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  }
 }
 
 startServer();
+

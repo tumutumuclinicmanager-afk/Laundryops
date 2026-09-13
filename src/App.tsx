@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Customer, Driver, ServiceItem, Order, Payment, Stats, Reports, OrderStatus } from "./types";
+import { Customer, Driver, ServiceItem, Order, Payment, Stats, Reports, OrderStatus, Review } from "./types";
 import { Dashboard } from "./components/Dashboard";
 import { OrdersView } from "./components/OrdersView";
 import { CustomersView } from "./components/CustomersView";
@@ -11,10 +11,13 @@ import { RecordPaymentModal } from "./components/RecordPaymentModal";
 import { InvoiceModal } from "./components/InvoiceModal";
 import { OrderDetailModal } from "./components/OrderDetailModal";
 import { LoginScreen } from "./components/LoginScreen";
-import { Truck, Package, Users, DollarSign, Settings, LayoutDashboard, Smartphone, Plus, ShieldCheck, LogOut, User } from "lucide-react";
+import { CustomerPage } from "./components/CustomerPage";
+import { Truck, Package, Users, DollarSign, Settings, LayoutDashboard, Smartphone, Plus, ShieldCheck, LogOut, User, Globe } from "lucide-react";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<{ role: 'admin' | 'driver'; username: string; name: string; driverId?: string } | null>(null);
+  const [publicScreen, setPublicScreen] = useState<'customer' | 'login'>('customer');
+  const [viewingCustomerPage, setViewingCustomerPage] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'customers' | 'financials' | 'driver' | 'settings'>('dashboard');
   const [viewMode, setViewMode] = useState<'admin' | 'driver'>('admin');
 
@@ -26,6 +29,7 @@ export default function App() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modals state
@@ -36,23 +40,36 @@ export default function App() {
 
   const fetchData = async () => {
     try {
-      const [statsRes, reportsRes, customersRes, driversRes, servicesRes, ordersRes, paymentsRes] = await Promise.all([
-        fetch("/api/stats").then(r => r.json()),
-        fetch("/api/reports").then(r => r.json()),
-        fetch("/api/customers").then(r => r.json()),
-        fetch("/api/drivers").then(r => r.json()),
-        fetch("/api/services").then(r => r.json()),
-        fetch("/api/orders").then(r => r.json()),
-        fetch("/api/payments").then(r => r.json())
+      const safeFetch = async (url: string, fallback: any) => {
+        try {
+          const r = await fetch(url);
+          if (!r.ok) return fallback;
+          const text = await r.text();
+          return JSON.parse(text);
+        } catch {
+          return fallback;
+        }
+      };
+
+      const [statsRes, reportsRes, customersRes, driversRes, servicesRes, ordersRes, paymentsRes, reviewsRes] = await Promise.all([
+        safeFetch("/api/stats", null),
+        safeFetch("/api/reports", null),
+        safeFetch("/api/customers", null),
+        safeFetch("/api/drivers", null),
+        safeFetch("/api/services", null),
+        safeFetch("/api/orders", null),
+        safeFetch("/api/payments", null),
+        safeFetch("/api/reviews", null)
       ]);
 
-      setStats(statsRes);
-      setReports(reportsRes);
-      setCustomers(customersRes);
-      setDrivers(driversRes);
-      setServices(servicesRes);
-      setOrders(ordersRes);
-      setPayments(paymentsRes);
+      if (statsRes) setStats(statsRes);
+      if (reportsRes) setReports(reportsRes);
+      if (Array.isArray(customersRes)) setCustomers(customersRes);
+      if (Array.isArray(driversRes)) setDrivers(driversRes);
+      if (Array.isArray(servicesRes)) setServices(servicesRes);
+      if (Array.isArray(ordersRes)) setOrders(ordersRes);
+      if (Array.isArray(paymentsRes)) setPayments(paymentsRes);
+      if (Array.isArray(reviewsRes)) setReviews(reviewsRes);
     } catch (e) {
       console.error("Failed to fetch backend data", e);
     } finally {
@@ -195,6 +212,45 @@ export default function App() {
     }
   };
 
+  const handleCustomerPlaceOrder = async (orderData: any): Promise<Order | null> => {
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData)
+      });
+      if (res.ok) {
+        const newOrder = await res.json();
+        await fetchData();
+        return newOrder;
+      }
+      return null;
+    } catch (e) {
+      console.error("Failed to place customer order", e);
+      return null;
+    }
+  };
+
+  const handleAddReview = async (reviewData: { customerName: string; rating: number; comment: string; serviceUsed?: string }): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reviewData)
+      });
+      if (res.ok) {
+        const newRev = await res.json();
+        setReviews(prev => [newRev, ...prev.filter(r => r.id !== newRev.id)]);
+        fetchData();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Failed to post review", e);
+      return false;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -208,17 +264,54 @@ export default function App() {
     );
   }
 
+  // Not logged in: Show Customer Page by default, with staff login toggle
   if (!currentUser) {
-    return <LoginScreen drivers={drivers} onLoginSuccess={(user) => {
-      setCurrentUser(user);
-      if (user.role === 'driver') {
-        setViewMode('driver');
-        setActiveTab('driver');
-      } else {
-        setViewMode('admin');
-        setActiveTab('dashboard');
-      }
-    }} />;
+    if (publicScreen === 'login') {
+      return (
+        <LoginScreen
+          drivers={drivers}
+          onGoToCustomerPage={() => setPublicScreen('customer')}
+          onLoginSuccess={(user) => {
+            setCurrentUser(user);
+            setViewingCustomerPage(false);
+            if (user.role === 'driver') {
+              setViewMode('driver');
+              setActiveTab('driver');
+            } else {
+              setViewMode('admin');
+              setActiveTab('dashboard');
+            }
+          }}
+        />
+      );
+    }
+
+    return (
+      <CustomerPage
+        services={services}
+        reviews={reviews}
+        onPlaceOrder={handleCustomerPlaceOrder}
+        onAddReview={handleAddReview}
+        onGoToLogin={() => setPublicScreen('login')}
+        isLoggedIn={false}
+      />
+    );
+  }
+
+  // If logged in but currently previewing Customer Page
+  if (viewingCustomerPage) {
+    return (
+      <CustomerPage
+        services={services}
+        reviews={reviews}
+        onPlaceOrder={handleCustomerPlaceOrder}
+        onAddReview={handleAddReview}
+        onGoToLogin={() => {}}
+        isLoggedIn={true}
+        currentUserRole={currentUser.role}
+        onBackToDashboard={() => setViewingCustomerPage(false)}
+      />
+    );
   }
 
   return (
@@ -292,6 +385,15 @@ export default function App() {
 
           {/* Right Action & User Profile */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setViewingCustomerPage(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all cursor-pointer border border-blue-200 shadow-2xs"
+              title="Open Customer-Facing Booking & Testimonials Page"
+            >
+              <Globe className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden sm:inline">Customer Portal</span>
+            </button>
+
             {currentUser.role === 'admin' && (
               <button
                 onClick={() => {

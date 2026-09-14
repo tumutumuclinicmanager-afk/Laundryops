@@ -233,16 +233,16 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xl shadow-md shadow-blue-500/20">
-              🧺
+              ✨
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-slate-900 text-lg tracking-tight">LaundryOps</span>
+                <span className="font-extrabold text-slate-900 text-lg tracking-tight">Sparkle Spins</span>
                 <span className="text-[11px] font-bold uppercase bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
                   Customer Portal
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium">Pickup & Delivery Laundry Service</p>
+              <p className="text-[11px] text-slate-500 font-medium">Doorstep Laundry & Garment Care</p>
             </div>
           </div>
 
@@ -257,7 +257,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               href="#services"
               className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-3 py-1.5"
             >
-              Services & Rates
+              Services Offered
             </a>
             <a
               href="#reviews"
@@ -444,18 +444,32 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 <span className="text-xs text-slate-500 font-medium">Phone Number:</span>
                 <span className="text-xs font-bold text-slate-900">{confirmedOrder.customerPhone}</span>
               </div>
+              <div className="flex justify-between items-center border-b border-slate-200/80 pb-2.5">
+                <span className="text-xs text-slate-500 font-medium">Payment Terms:</span>
+                <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                  Pay on Delivery (M-Pesa or Cash)
+                </span>
+              </div>
               <div className="flex justify-between items-center pt-1">
-                <span className="text-sm font-bold text-slate-800">Estimated Total:</span>
-                <span className="text-base font-black text-emerald-600">KSh {confirmedOrder.total.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 font-medium">Pre-Delivery Invoice:</span>
+                <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200">
+                  Will be sent to your phone before rider arrives
+                </span>
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-800 space-y-1">
-              <p className="font-bold flex items-center gap-1.5">
-                <Truck className="w-4 h-4 text-blue-600" /> What happens next?
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-900 space-y-1.5">
+              <p className="font-extrabold flex items-center gap-1.5 text-blue-950">
+                <Sparkles className="w-4 h-4 text-blue-600" /> What happens next?
               </p>
-              <p className="text-blue-700 leading-relaxed">
-                Our rider will arrive during your scheduled pickup window with specialized laundry bags. You can inspect and weigh items on the spot and pay upon delivery via M-Pesa or Cash.
+              <p className="text-blue-800 leading-relaxed">
+                1. Our rider will arrive during your scheduled window to collect your garments. No payment is required at pickup.
+              </p>
+              <p className="text-blue-800 leading-relaxed">
+                2. Our facility team will weigh and inspect your garments, then send you an official itemized invoice via SMS/WhatsApp before delivery.
+              </p>
+              <p className="text-blue-800 leading-relaxed">
+                3. You inspect your fresh garments upon delivery and pay via M-Pesa or Cash.
               </p>
             </div>
 
@@ -685,15 +699,14 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                             </span>
                             <h4 className="font-bold text-xs sm:text-sm text-slate-900 mt-0.5">{service.name}</h4>
                           </div>
-                          <span className="font-black text-xs sm:text-sm text-blue-700 whitespace-nowrap">
-                            KSh {service.price.toLocaleString()}
-                            <span className="text-[10px] text-slate-400 font-normal"> /{service.unit}</span>
+                          <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+                            Billed per {service.unit}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
-                          <span className="text-xs text-slate-500 font-medium">
-                            {count > 0 ? `Subtotal: KSh ${(count * service.price).toLocaleString()}` : "Select quantity"}
+                          <span className="text-xs text-slate-600 font-medium">
+                            {count > 0 ? `${count} ${service.unit}${count > 1 && service.unit === 'item' ? 's' : ''} selected` : "Select quantity"}
                           </span>
                           <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 p-0.5 shadow-2xs">
                             <button
@@ -750,46 +763,47 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                     {selectedItemsList.map((item) => (
-                      <div key={item.serviceId} className="flex justify-between items-center text-xs py-1.5 border-b border-slate-100">
+                      <div key={item.serviceId} className="flex justify-between items-center text-xs py-2 border-b border-slate-100">
                         <div>
-                          <span className="font-bold text-slate-800">{item.serviceName}</span>
-                          <span className="text-[11px] text-slate-400 block">
-                            {item.quantity} {item.unit} × KSh {item.unitPrice.toLocaleString()}
+                          <span className="font-bold text-slate-800 text-xs sm:text-sm block">{item.serviceName}</span>
+                          <span className="text-[11px] text-slate-400">
+                            Quantity requested: {item.quantity} {item.unit}{item.quantity > 1 && item.unit === 'item' ? 's' : ''}
                           </span>
                         </div>
-                        <span className="font-bold text-slate-900">
-                          KSh {item.subtotal.toLocaleString()}
+                        <span className="font-bold text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
+                          {item.quantity} {item.unit}
                         </span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Pricing Summary */}
-                <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-xs border border-slate-100">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Laundry Subtotal</span>
-                    <span className="font-bold text-slate-800">KSh {estimatedTotal.toLocaleString()}</span>
+                {/* Pre-Delivery Invoicing Notice Card */}
+                <div className="bg-blue-50/90 rounded-2xl p-4 space-y-3 text-xs border border-blue-200">
+                  <div className="flex items-center gap-2 font-black text-blue-950 text-sm">
+                    <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>Invoicing & Payment on Delivery</span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Doorstep Pickup & Delivery</span>
-                    <span className="text-emerald-600 font-bold">FREE</span>
+                  <div className="space-y-2 text-slate-700 text-xs leading-relaxed">
+                    <div className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span><strong>Doorstep Collection & Delivery:</strong> 100% FREE.</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span><strong>Protective Packaging:</strong> Complimentary fresh covers.</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                      <span><strong>Pre-Delivery Invoice:</strong> After pickup, we inspect and weigh your items at the facility and text you the itemized invoice before delivery.</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span><strong>Pay on Delivery:</strong> Payment is collected upon delivery, NOT on pickup (M-Pesa or Cash).</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Protective Packaging</span>
-                    <span className="text-emerald-600 font-bold">FREE</span>
-                  </div>
-                  <div className="border-t border-slate-200 pt-2 flex justify-between items-center">
-                    <span className="text-sm font-bold text-slate-900">Estimated Total:</span>
-                    <span className="text-lg font-black text-blue-700">KSh {estimatedTotal.toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3 text-[11px] text-emerald-800 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>No prepayment required. Pay via M-Pesa or Cash upon rider delivery.</span>
                 </div>
 
                 <button
@@ -804,7 +818,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                     </>
                   ) : (
                     <>
-                      <Truck className="w-4 h-4" /> Book Pickup Now
+                      <Truck className="w-4 h-4" /> Book Pickup (Pay on Delivery)
                     </>
                   )}
                 </button>
@@ -1088,7 +1102,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
         <div className="max-w-6xl mx-auto px-4 sm:px-6 grid sm:grid-cols-3 gap-8">
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-white font-bold text-base">
-              <span>🧺</span> LaundryOps Pro
+              <span>✨</span> Sparkle Spins
             </div>
             <p className="text-slate-400 leading-relaxed text-xs">
               Reliable laundry, dry cleaning, and garment care with scheduled doorstep collection and delivery.
@@ -1126,7 +1140,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
         </div>
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 mt-8 border-t border-slate-800/80 text-center text-slate-400">
-          © {new Date().getFullYear()} LaundryOps Manager. All rights reserved.
+          © {new Date().getFullYear()} Sparkle Spins. All rights reserved.
         </div>
       </footer>
     </div>

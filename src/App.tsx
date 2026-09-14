@@ -219,15 +219,22 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderData)
       });
-      if (res.ok) {
-        const newOrder = await res.json();
-        await fetchData();
-        return newOrder;
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        console.warn("Non-JSON response from /api/orders:", text);
       }
-      return null;
-    } catch (e) {
-      console.error("Failed to place customer order", e);
-      return null;
+
+      if (res.ok && data) {
+        await fetchData();
+        return data as Order;
+      }
+      throw new Error(data?.error || `Failed to create order (${res.status})`);
+    } catch (e: any) {
+      console.error("Failed to place customer order:", e);
+      throw e;
     }
   };
 

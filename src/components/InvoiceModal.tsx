@@ -47,14 +47,22 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
           {/* Header */}
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">LaundryOps & Dry Cleaning</h1>
-              <p className="text-xs text-slate-500 mt-0.5">Professional Pickup & Delivery Service</p>
-              <p className="text-xs text-slate-500">support@laundryops.co.ke • +254 700 123456</p>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">✨</span>
+                <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Sparkle Spins</h1>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">Professional Laundry, Dry Cleaning & Ironing</p>
+              <p className="text-xs text-slate-500">hello@sparklespins.co.ke • +254 700 123456</p>
             </div>
             <div className="text-right">
               <div className="text-lg font-bold text-indigo-600">INVOICE</div>
               <div className="text-xs font-mono text-slate-600 mt-0.5">{order.orderNumber}</div>
               <div className="text-xs text-slate-500 mt-1">Date: {new Date(order.createdAt).toLocaleDateString()}</div>
+              <div className="mt-1">
+                <span className="inline-block bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                  Payment Due On Delivery
+                </span>
+              </div>
             </div>
           </div>
 
@@ -129,8 +137,9 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
           </div>
 
           {/* Footer note */}
-          <div className="pt-6 border-t border-slate-100 text-center text-xs text-slate-500">
-            <p>Thank you for trusting LaundryOps with your garments! For questions, call our support line.</p>
+          <div className="pt-6 border-t border-slate-100 text-center text-xs text-slate-500 space-y-1">
+            <p className="font-semibold text-slate-700">Thank you for trusting Sparkle Spins with your garments!</p>
+            <p className="text-[11px] text-slate-400">Payment is collected on delivery via M-Pesa or Cash. For any queries, call +254 700 123456.</p>
           </div>
         </div>
       </div>

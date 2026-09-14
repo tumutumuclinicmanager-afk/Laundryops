@@ -67,6 +67,8 @@ export interface Order {
   balanceDue: number;
   notes?: string;
   proofOfDelivery?: string;
+  invoiceSent?: boolean;
+  invoiceSentAt?: string;
   createdAt: string;
   updatedAt: string;
 }

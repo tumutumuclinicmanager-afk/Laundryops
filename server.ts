@@ -23,9 +23,53 @@ try {
 
   const appInstance: App = getApps().length === 0 ? initializeApp({ projectId }) : getApps()[0];
   firestore = getFirestore(appInstance, databaseId);
-  console.log(`[Firestore] Initialized for databaseId: ${databaseId}`);
+  try {
+    firestore.settings({ ignoreUndefinedProperties: true });
+    console.log(`[Firestore] Initialized for databaseId: ${databaseId} with ignoreUndefinedProperties=true`);
+  } catch (settingErr) {
+    console.warn("[Firestore] Could not apply settings:", settingErr);
+  }
 } catch (e: any) {
   console.warn("[Firestore] Admin initialization note:", e?.message || e);
+}
+
+// Deep recursive cleaner to ensure no undefined fields ever reach Firestore documents
+function cleanForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanForFirestore(item));
+  }
+  if (typeof obj === "object" && !(obj instanceof Date)) {
+    const clean: Record<string, any> = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (val !== undefined) {
+        clean[key] = cleanForFirestore(val);
+      }
+    }
+    return clean;
+  }
+  return obj;
+}
+
+async function saveToFirestore(collection: string, id: string, data: any): Promise<void> {
+  if (!firestore) return;
+  try {
+    const cleaned = cleanForFirestore(data);
+    await firestore.collection(collection).doc(id).set(cleaned);
+  } catch (err) {
+    console.warn(`[Firestore] Failed to save to ${collection}/${id}:`, err);
+  }
+}
+
+async function deleteFromFirestore(collection: string, id: string): Promise<void> {
+  if (!firestore) return;
+  try {
+    await firestore.collection(collection).doc(id).delete();
+  } catch (err) {
+    console.warn(`[Firestore] Failed to delete from ${collection}/${id}:`, err);
+  }
 }
 
 const app = express();
@@ -312,7 +356,7 @@ async function getCollection<T extends { id: string }>(name: string, fallbackLis
         const batch = firestore.batch();
         for (const item of fallbackList) {
           const ref = firestore.collection(name).doc(item.id);
-          batch.set(ref, item);
+          batch.set(ref, cleanForFirestore(item));
         }
         await batch.commit();
       } catch (seedErr) {
@@ -339,12 +383,12 @@ app.post("/api/seed", async (req, res) => {
     if (firestore) {
       try {
         const batch = firestore.batch();
-        for (const c of initialCustomers) batch.set(firestore.collection("customers").doc(c.id), c);
-        for (const d of initialDrivers) batch.set(firestore.collection("drivers").doc(d.id), d);
-        for (const s of initialServices) batch.set(firestore.collection("services").doc(s.id), s);
-        for (const o of initialOrders) batch.set(firestore.collection("orders").doc(o.id), o);
-        for (const p of initialPayments) batch.set(firestore.collection("payments").doc(p.id), p);
-        for (const r of initialReviews) batch.set(firestore.collection("reviews").doc(r.id), r);
+        for (const c of initialCustomers) batch.set(firestore.collection("customers").doc(c.id), cleanForFirestore(c));
+        for (const d of initialDrivers) batch.set(firestore.collection("drivers").doc(d.id), cleanForFirestore(d));
+        for (const s of initialServices) batch.set(firestore.collection("services").doc(s.id), cleanForFirestore(s));
+        for (const o of initialOrders) batch.set(firestore.collection("orders").doc(o.id), cleanForFirestore(o));
+        for (const p of initialPayments) batch.set(firestore.collection("payments").doc(p.id), cleanForFirestore(p));
+        for (const r of initialReviews) batch.set(firestore.collection("reviews").doc(r.id), cleanForFirestore(r));
         await batch.commit();
       } catch (fsErr) {
         console.warn("[Firestore] Batch seed note:", fsErr);
@@ -401,17 +445,15 @@ app.post("/api/customers", async (req, res) => {
   }
   const newCustomer: Customer = {
     id: "c_" + Date.now(),
-    name,
-    phone,
-    address,
-    notes: notes || "",
+    name: String(name).trim(),
+    phone: String(phone).trim(),
+    address: String(address).trim(),
+    notes: notes ? String(notes).trim() : "",
     createdAt: new Date().toISOString()
   };
 
   inMemoryCustomers.unshift(newCustomer);
-  if (firestore) {
-    firestore.collection("customers").doc(newCustomer.id).set(newCustomer).catch(() => {});
-  }
+  saveToFirestore("customers", newCustomer.id, newCustomer);
   res.status(201).json(newCustomer);
 });
 
@@ -452,8 +494,8 @@ app.post("/api/drivers", async (req, res) => {
   const pwd = password || 'rider123';
   const newDriver: Driver = {
     id: "d_" + Date.now(),
-    name,
-    phone,
+    name: String(name).trim(),
+    phone: String(phone).trim(),
     vehicle: vehicle || "Delivery Motorcycle",
     status: status || "Available",
     username: uname,
@@ -461,9 +503,7 @@ app.post("/api/drivers", async (req, res) => {
   };
 
   inMemoryDrivers.push(newDriver);
-  if (firestore) {
-    firestore.collection("drivers").doc(newDriver.id).set(newDriver).catch(() => {});
-  }
+  saveToFirestore("drivers", newDriver.id, newDriver);
   res.status(201).json(newDriver);
 });
 
@@ -474,9 +514,7 @@ app.delete("/api/drivers/:id", async (req, res) => {
     return res.status(404).json({ error: "Rider not found" });
   }
   inMemoryDrivers.splice(index, 1);
-  if (firestore) {
-    firestore.collection("drivers").doc(id).delete().catch(() => {});
-  }
+  deleteFromFirestore("drivers", id);
   res.json({ success: true });
 });
 
@@ -493,16 +531,14 @@ app.post("/api/services", async (req, res) => {
   }
   const newService: ServiceItem = {
     id: "s_" + Date.now(),
-    name,
+    name: String(name).trim(),
     category,
     unit,
     price: Number(price)
   };
 
   inMemoryServices.push(newService);
-  if (firestore) {
-    firestore.collection("services").doc(newService.id).set(newService).catch(() => {});
-  }
+  saveToFirestore("services", newService.id, newService);
   res.status(201).json(newService);
 });
 
@@ -530,138 +566,263 @@ app.get("/api/orders/:id", async (req, res) => {
 });
 
 app.post("/api/orders", async (req, res) => {
-  const {
-    customerId,
-    customerName,
-    customerPhone,
-    customerAddress,
-    pickupDate,
-    pickupTimeWindow,
-    deliveryDate,
-    deliveryTimeWindow,
-    driverId,
-    items,
-    discount = 0,
-    notes
-  } = req.body;
+  try {
+    const {
+      customerId,
+      customerName,
+      customerPhone,
+      customerAddress,
+      pickupDate,
+      pickupTimeWindow,
+      deliveryDate,
+      deliveryTimeWindow,
+      driverId,
+      items,
+      discount = 0,
+      notes
+    } = req.body;
 
-  const customers = await getCollection<Customer>("customers", inMemoryCustomers);
-  let customer: Customer | undefined;
+    const customers = await getCollection<Customer>("customers", inMemoryCustomers);
+    let customer: Customer | undefined;
 
-  if (customerId) {
-    customer = customers.find(c => c.id === customerId);
-  } else if (customerName && customerPhone) {
-    const cleanPhone = String(customerPhone).replace(/\D/g, "");
-    customer = customers.find(c => c.phone.replace(/\D/g, "") === cleanPhone);
-    if (!customer) {
-      customer = {
-        id: "c_" + Date.now(),
-        name: String(customerName).trim(),
-        phone: String(customerPhone).trim(),
-        address: customerAddress ? String(customerAddress).trim() : "Address provided on booking",
-        notes: notes ? `Guest Booking: ${notes}` : "Booked via customer portal",
-        createdAt: new Date().toISOString()
-      };
-      inMemoryCustomers.unshift(customer);
-      if (firestore) {
-        firestore.collection("customers").doc(customer.id).set(customer).catch(() => {});
+    if (customerId) {
+      customer = customers.find(c => c.id === customerId);
+    } else if (customerName && customerPhone) {
+      const cleanPhone = String(customerPhone).replace(/\D/g, "");
+      customer = customers.find(c => c.phone.replace(/\D/g, "") === cleanPhone);
+      if (!customer) {
+        customer = {
+          id: "c_" + Date.now(),
+          name: String(customerName).trim(),
+          phone: String(customerPhone).trim(),
+          address: customerAddress ? String(customerAddress).trim() : "Address provided on booking",
+          notes: notes ? `Guest Booking: ${String(notes).trim()}` : "Booked via customer portal",
+          createdAt: new Date().toISOString()
+        };
+        inMemoryCustomers.unshift(customer);
+        saveToFirestore("customers", customer.id, customer);
+      } else if (customerAddress && String(customerAddress).trim()) {
+        customer.address = String(customerAddress).trim();
+        saveToFirestore("customers", customer.id, customer);
       }
-    } else if (customerAddress && customerAddress.trim()) {
-      customer.address = String(customerAddress).trim();
     }
-  }
 
-  if (!customer) {
-    return res.status(400).json({ error: "Customer information is required (name, phone, address)" });
-  }
+    if (!customer) {
+      return res.status(400).json({ error: "Customer information is required (name, phone, address)" });
+    }
 
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: "Order must contain at least one service item" });
-  }
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "Order must contain at least one service item" });
+    }
 
-  const services = await getCollection<ServiceItem>("services", inMemoryServices);
-  let subtotal = 0;
-  const processedItems: OrderItem[] = items.map((item: any) => {
-    const sItem = services.find(s => s.id === item.serviceId);
-    const unitPrice = sItem ? sItem.price : (item.unitPrice || 0);
-    const itemSubtotal = unitPrice * Number(item.quantity);
-    subtotal += itemSubtotal;
-    return {
-      serviceId: item.serviceId,
-      serviceName: sItem ? sItem.name : item.serviceName,
-      unit: sItem ? sItem.unit : (item.unit || 'item'),
-      quantity: Number(item.quantity),
-      unitPrice,
-      subtotal: itemSubtotal
-    };
-  });
+    const services = await getCollection<ServiceItem>("services", inMemoryServices);
+    let subtotal = 0;
+    const processedItems: OrderItem[] = items.map((item: any) => {
+      const sItem = services.find(s => s.id === item.serviceId);
+      const unitPrice = sItem ? sItem.price : (Number(item.unitPrice) || 0);
+      const itemSubtotal = unitPrice * Number(item.quantity);
+      subtotal += itemSubtotal;
+      return {
+        serviceId: item.serviceId,
+        serviceName: sItem ? sItem.name : item.serviceName,
+        unit: sItem ? sItem.unit : (item.unit || 'item'),
+        quantity: Number(item.quantity),
+        unitPrice,
+        subtotal: itemSubtotal
+      };
+    });
 
-  const total = Math.max(0, subtotal - Number(discount));
-  const orderNum = "ORD-" + Math.floor(100 + Math.random() * 900);
+    const parsedDiscount = Number(discount) || 0;
+    const total = Math.max(0, subtotal - parsedDiscount);
+    const orderNum = "ORD-" + Math.floor(100 + Math.random() * 900);
 
-  let driverName = "";
-  if (driverId) {
-    const drivers = await getCollection<Driver>("drivers", inMemoryDrivers);
-    const d = drivers.find(dr => dr.id === driverId);
-    if (d) driverName = d.name;
-  }
-
-  const newOrder: Order = {
-    id: "ord_" + Date.now(),
-    orderNumber: orderNum,
-    customerId: customer.id,
-    customerName: customer.name,
-    customerPhone: customer.phone,
-    customerAddress: customer.address,
-    status: "New",
-    pickupDate: pickupDate || new Date().toISOString().split("T")[0],
-    pickupTimeWindow: pickupTimeWindow || "09:00 AM - 11:00 AM",
-    deliveryDate: deliveryDate || new Date().toISOString().split("T")[0],
-    deliveryTimeWindow: deliveryTimeWindow || "02:00 PM - 04:00 PM",
-    driverId: driverId || undefined,
-    driverName: driverName || undefined,
-    items: processedItems,
-    subtotal,
-    discount: Number(discount),
-    total,
-    paymentStatus: "Unpaid",
-    amountPaid: 0,
-    balanceDue: total,
-    notes: notes || "",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  inMemoryOrders.unshift(newOrder);
-  if (firestore) {
-    firestore.collection("orders").doc(newOrder.id).set(newOrder).catch(() => {});
-  }
-  res.status(201).json(newOrder);
-});
-
-app.patch("/api/orders/:id/status", async (req, res) => {
-  const { status, proofOfDelivery, driverId } = req.body;
-  const order = inMemoryOrders.find(o => o.id === req.params.id);
-  if (!order) return res.status(404).json({ error: "Order not found" });
-
-  if (status) order.status = status;
-  if (proofOfDelivery !== undefined) order.proofOfDelivery = proofOfDelivery;
-  if (driverId !== undefined) {
-    order.driverId = driverId || undefined;
+    let driverName = "";
     if (driverId) {
       const drivers = await getCollection<Driver>("drivers", inMemoryDrivers);
       const d = drivers.find(dr => dr.id === driverId);
-      order.driverName = d ? d.name : undefined;
-    } else {
-      order.driverName = undefined;
+      if (d) driverName = d.name;
     }
-  }
-  order.updatedAt = new Date().toISOString();
 
-  if (firestore) {
-    firestore.collection("orders").doc(order.id).set(order).catch(() => {});
+    const newOrder: Order = {
+      id: "ord_" + Date.now(),
+      orderNumber: orderNum,
+      customerId: customer.id,
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      customerAddress: customer.address,
+      status: "New",
+      pickupDate: pickupDate || new Date().toISOString().split("T")[0],
+      pickupTimeWindow: pickupTimeWindow || "09:00 AM - 11:00 AM",
+      deliveryDate: deliveryDate || new Date().toISOString().split("T")[0],
+      deliveryTimeWindow: deliveryTimeWindow || "02:00 PM - 04:00 PM",
+      driverId: driverId ? String(driverId) : "",
+      driverName: driverName || "",
+      items: processedItems,
+      subtotal,
+      discount: parsedDiscount,
+      total,
+      paymentStatus: "Unpaid",
+      amountPaid: 0,
+      balanceDue: total,
+      notes: notes ? String(notes).trim() : "",
+      invoiceSent: false,
+      invoiceSentAt: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    inMemoryOrders.unshift(newOrder);
+    saveToFirestore("orders", newOrder.id, newOrder);
+    res.status(201).json(newOrder);
+  } catch (orderErr: any) {
+    console.error("[Orders] Creation error:", orderErr);
+    res.status(500).json({ error: orderErr?.message || "Failed to process order" });
   }
-  res.json(order);
+});
+
+// Update order details, items, pricing, or weights after facility inspection
+app.put("/api/orders/:id", async (req, res) => {
+  try {
+    const order = inMemoryOrders.find(o => o.id === req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    const {
+      items,
+      discount,
+      status,
+      driverId,
+      deliveryDate,
+      deliveryTimeWindow,
+      pickupDate,
+      pickupTimeWindow,
+      notes,
+      invoiceSent
+    } = req.body;
+
+    if (items && Array.isArray(items)) {
+      let subtotal = 0;
+      order.items = items.map((it: any) => {
+        const qty = Number(it.quantity) || 1;
+        const unitPrice = Number(it.unitPrice) || 0;
+        const sub = unitPrice * qty;
+        subtotal += sub;
+        return {
+          serviceId: String(it.serviceId || ""),
+          serviceName: String(it.serviceName || "Laundry Item"),
+          unit: String(it.unit || "item"),
+          quantity: qty,
+          unitPrice,
+          subtotal: sub
+        };
+      });
+      order.subtotal = subtotal;
+      const parsedDiscount = discount !== undefined ? Number(discount) : order.discount;
+      order.discount = parsedDiscount;
+      order.total = Math.max(0, subtotal - parsedDiscount);
+      order.balanceDue = Math.max(0, order.total - order.amountPaid);
+      if (order.balanceDue === 0 && order.total > 0 && order.amountPaid >= order.total) {
+        order.paymentStatus = "Paid";
+      } else if (order.amountPaid > 0) {
+        order.paymentStatus = "Partial";
+      } else {
+        order.paymentStatus = "Unpaid";
+      }
+    } else if (discount !== undefined) {
+      order.discount = Number(discount) || 0;
+      order.total = Math.max(0, order.subtotal - order.discount);
+      order.balanceDue = Math.max(0, order.total - order.amountPaid);
+    }
+
+    if (status) order.status = status;
+    if (deliveryDate) order.deliveryDate = deliveryDate;
+    if (deliveryTimeWindow) order.deliveryTimeWindow = deliveryTimeWindow;
+    if (pickupDate) order.pickupDate = pickupDate;
+    if (pickupTimeWindow) order.pickupTimeWindow = pickupTimeWindow;
+    if (notes !== undefined) order.notes = notes;
+    if (invoiceSent !== undefined) {
+      order.invoiceSent = Boolean(invoiceSent);
+      if (order.invoiceSent && !order.invoiceSentAt) {
+        order.invoiceSentAt = new Date().toISOString();
+      }
+    }
+
+    if (driverId !== undefined) {
+      order.driverId = driverId ? String(driverId) : "";
+      if (driverId) {
+        const drivers = await getCollection<Driver>("drivers", inMemoryDrivers);
+        const d = drivers.find(dr => dr.id === driverId);
+        order.driverName = d ? d.name : "";
+      } else {
+        order.driverName = "";
+      }
+    }
+
+    order.updatedAt = new Date().toISOString();
+    saveToFirestore("orders", order.id, order);
+    res.json(order);
+  } catch (err: any) {
+    console.error("[Orders] Update error:", err);
+    res.status(500).json({ error: err.message || "Failed to update order" });
+  }
+});
+
+app.patch("/api/orders/:id/status", async (req, res) => {
+  try {
+    const { status, proofOfDelivery, driverId } = req.body;
+    const order = inMemoryOrders.find(o => o.id === req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    if (status) order.status = status;
+    if (proofOfDelivery !== undefined) order.proofOfDelivery = proofOfDelivery;
+    if (driverId !== undefined) {
+      order.driverId = driverId ? String(driverId) : "";
+      if (driverId) {
+        const drivers = await getCollection<Driver>("drivers", inMemoryDrivers);
+        const d = drivers.find(dr => dr.id === driverId);
+        order.driverName = d ? d.name : "";
+      } else {
+        order.driverName = "";
+      }
+    }
+    order.updatedAt = new Date().toISOString();
+
+    saveToFirestore("orders", order.id, order);
+    res.json(order);
+  } catch (patchErr: any) {
+    console.error("[Orders] Status patch error:", patchErr);
+    res.status(500).json({ error: patchErr?.message || "Failed to update order status" });
+  }
+});
+
+// Admin sends the pre-delivery invoice to the client
+app.post("/api/orders/:id/send-invoice", async (req, res) => {
+  try {
+    const order = inMemoryOrders.find(o => o.id === req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    const { customMessage } = req.body;
+    order.invoiceSent = true;
+    order.invoiceSentAt = new Date().toISOString();
+    order.updatedAt = new Date().toISOString();
+
+    const itemsSummary = order.items.map(it => `${it.serviceName} (${it.quantity} ${it.unit}): KSh ${it.subtotal.toLocaleString()}`).join(", ");
+    const defaultInvoiceMessage = `Sparkle Spins INVOICE for Order ${order.orderNumber}: Hello ${order.customerName}, your laundry items have been processed! Amount due on delivery: KSh ${order.total.toLocaleString()} (Items: ${itemsSummary}). Scheduled delivery: ${order.deliveryDate} (${order.deliveryTimeWindow})${order.driverName ? ` with rider ${order.driverName}` : ""}. Payment is payable on delivery via M-Pesa or Cash. Thank you for choosing Sparkle Spins!`;
+
+    const messageToSend = customMessage || defaultInvoiceMessage;
+
+    saveToFirestore("orders", order.id, order);
+    console.log(`[Sparkle Spins Pre-Delivery Invoice SMS] To ${order.customerPhone}: "${messageToSend}"`);
+
+    res.json({
+      success: true,
+      order,
+      invoiceMessage: messageToSend,
+      sentAt: order.invoiceSentAt
+    });
+  } catch (err: any) {
+    console.error("[Invoice] Dispatch error:", err);
+    res.status(500).json({ error: err.message || "Failed to dispatch invoice" });
+  }
 });
 
 // Mock SMS Notification API endpoint
@@ -672,8 +833,8 @@ app.post("/api/orders/:id/send-sms", async (req, res) => {
     if (!order) return res.status(404).json({ error: "Order not found" });
 
     const riderPart = order.driverName ? ` Assigned Rider: ${order.driverName}.` : "";
-    const balancePart = order.balanceDue > 0 ? ` Balance Due: KSh ${order.balanceDue.toLocaleString()}.` : " Status: Paid in full.";
-    const defaultMessage = `Hello ${order.customerName}, LaundryOps update for Order ${order.orderNumber}: Status is '${order.status}'. Delivery scheduled: ${order.deliveryDate} (${order.deliveryTimeWindow}).${riderPart}${balancePart} Thank you!`;
+    const balancePart = order.balanceDue > 0 ? ` Balance Due: KSh ${order.balanceDue.toLocaleString()} (payable on delivery).` : " Status: Paid in full.";
+    const defaultMessage = `Hello ${order.customerName}, Sparkle Spins update for Order ${order.orderNumber}: Status is '${order.status}'. Delivery scheduled: ${order.deliveryDate} (${order.deliveryTimeWindow}).${riderPart}${balancePart} Thank you for choosing Sparkle Spins!`;
 
     const finalMessage = customMessage || defaultMessage;
     const smsLog = {
@@ -735,10 +896,8 @@ app.post("/api/payments", async (req, res) => {
   }
   order.updatedAt = new Date().toISOString();
 
-  if (firestore) {
-    firestore.collection("payments").doc(newPayment.id).set(newPayment).catch(() => {});
-    firestore.collection("orders").doc(order.id).set(order).catch(() => {});
-  }
+  saveToFirestore("payments", newPayment.id, newPayment);
+  saveToFirestore("orders", order.id, order);
   res.status(201).json({ payment: newPayment, order });
 });
 
@@ -794,9 +953,7 @@ app.post("/api/reviews", async (req, res) => {
   };
 
   inMemoryReviews.unshift(newReview);
-  if (firestore) {
-    firestore.collection("reviews").doc(newReview.id).set(newReview).catch(() => {});
-  }
+  saveToFirestore("reviews", newReview.id, newReview);
   res.status(201).json(newReview);
 });
 

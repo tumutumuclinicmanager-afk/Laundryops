@@ -1,6 +1,6 @@
 {
-  "name": "LaundryOps Manager",
-  "description": "Pickup & delivery laundry management platform with doorstep customer booking portal, operational logistics, driver route dispatch, and customer reviews",
+  "name": "Sparkle Spins",
+  "description": "Sparkle Spins pickup & delivery laundry service with doorstep customer booking, operational logistics, driver route dispatch, and itemized pre-delivery invoicing",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

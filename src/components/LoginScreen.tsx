@@ -89,8 +89,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, driver
           <div className="w-14 h-14 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/30 text-white">
             <Truck className="w-7 h-7" />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">LaundryOps Portal</h1>
-          <p className="text-xs text-slate-500 font-medium">Logistics & Dry Cleaning Management System</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Sparkle Spins Portal</h1>
+          <p className="text-xs text-slate-500 font-medium">Logistics & Garment Care Management System</p>
         </div>
 
         {/* Role Toggle */}

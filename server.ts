@@ -467,10 +467,10 @@ app.post("/api/customers", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   const { role, username, password, isGoogle } = req.body;
   if (role === 'admin') {
-    if (isGoogle || (username === 'admin' && password === 'admin123') || (username && username.includes('@'))) {
+    if (password === 'admin123') {
       return res.json({ role: 'admin', username: username || 'admin', name: 'Administrator' });
     }
-    return res.status(401).json({ error: "Invalid admin credentials. Use admin / admin123 or Sign in with Google." });
+    return res.status(401).json({ error: "Invalid admin password. Please use 'admin123'." });
   } else if (role === 'driver') {
     const drivers = await getCollection<Driver>("drivers", inMemoryDrivers);
     const driver = drivers.find(d => 

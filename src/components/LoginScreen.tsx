@@ -38,10 +38,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, driver
       } catch {
         // Safe fallback in case server returns static or proxy payload
         if (role === 'admin') {
-          if (isGoogle || (username === 'admin' && password === 'admin123') || (username && username.includes('@'))) {
+          if (password === 'admin123') {
             onLoginSuccess({ role: 'admin', username: username || 'admin', name: 'Administrator' });
             return;
           }
+          throw new Error('Invalid admin password. Please use admin123.');
         } else if (role === 'driver') {
           const rider = drivers.find(d => 
             d.username?.toLowerCase() === username.toLowerCase() || 
@@ -52,7 +53,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, driver
             return;
           }
         }
-        throw new Error('Authentication service temporarily unreachable. Use default credentials (admin / admin123).');
+        throw new Error('Authentication failed. Use admin123 for admin login.');
       }
 
       if (!response.ok) {

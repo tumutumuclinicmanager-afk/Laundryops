@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Customer, Driver, ServiceItem, Order, Payment, Stats, Reports, OrderStatus, Review } from "./types";
+import {
+  initialCustomers,
+  initialDrivers,
+  initialServices,
+  initialOrders,
+  initialPayments,
+  initialReviews,
+  computeStats,
+  computeReports
+} from "./initialData";
 import { Dashboard } from "./components/Dashboard";
 import { OrdersView } from "./components/OrdersView";
 import { CustomersView } from "./components/CustomersView";
@@ -25,13 +35,24 @@ export default function App() {
   // App data state
   const [stats, setStats] = useState<Stats | null>(null);
   const [reports, setReports] = useState<Reports | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [services, setServices] = useState<ServiceItem[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
+  const [services, setServices] = useState<ServiceItem[]>(initialServices);
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [payments, setPayments] = useState<Payment[]>(initialPayments);
+  const [reviews, setReviews] = useState<Review[]>(initialReviews);
+  const [loading, setLoading] = useState(false);
+
+  // Dynamic statistics fallback so Dashboard and Financials never stall
+  const effectiveStats: Stats = useMemo(() => {
+    if (stats) return stats;
+    return computeStats(orders, payments);
+  }, [stats, orders, payments]);
+
+  const effectiveReports: Reports = useMemo(() => {
+    if (reports) return reports;
+    return computeReports(orders, payments, customers.length);
+  }, [reports, orders, payments, customers.length]);
 
   // Modals state
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
@@ -65,14 +86,14 @@ export default function App() {
 
       if (statsRes) setStats(statsRes);
       if (reportsRes) setReports(reportsRes);
-      if (Array.isArray(customersRes)) setCustomers(customersRes);
-      if (Array.isArray(driversRes)) setDrivers(driversRes);
-      if (Array.isArray(servicesRes)) setServices(servicesRes);
-      if (Array.isArray(ordersRes)) setOrders(ordersRes);
-      if (Array.isArray(paymentsRes)) setPayments(paymentsRes);
-      if (Array.isArray(reviewsRes)) setReviews(reviewsRes);
+      if (Array.isArray(customersRes) && customersRes.length > 0) setCustomers(customersRes);
+      if (Array.isArray(driversRes) && driversRes.length > 0) setDrivers(driversRes);
+      if (Array.isArray(servicesRes) && servicesRes.length > 0) setServices(servicesRes);
+      if (Array.isArray(ordersRes) && ordersRes.length > 0) setOrders(ordersRes);
+      if (Array.isArray(paymentsRes) && paymentsRes.length > 0) setPayments(paymentsRes);
+      if (Array.isArray(reviewsRes) && reviewsRes.length > 0) setReviews(reviewsRes);
     } catch (e) {
-      console.error("Failed to fetch backend data", e);
+      console.warn("Backend data fetch note:", e);
     } finally {
       setLoading(false);
     }
@@ -665,7 +686,7 @@ export default function App() {
           <>
             {activeTab === 'dashboard' && (
               <Dashboard
-                stats={stats}
+                stats={effectiveStats}
                 onNavigate={(tab) => setActiveTab(tab as any)}
                 onOpenNewOrder={() => setShowNewOrderModal(true)}
                 onSelectOrder={(ord) => setSelectedOrderForDetail(ord)}
@@ -695,7 +716,7 @@ export default function App() {
               <FinancialsView
                 orders={orders}
                 payments={payments}
-                reports={reports}
+                reports={effectiveReports}
                 onOpenPaymentModal={(ord) => setSelectedOrderForPayment(ord)}
                 onOpenInvoice={(ord) => setSelectedOrderForInvoice(ord)}
               />

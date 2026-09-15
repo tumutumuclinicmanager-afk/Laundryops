@@ -17,13 +17,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onSelectOrder,
   onUpdateStatus
 }) => {
-  if (!stats) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
+  // Ensure the dashboard always initializes cleanly without hanging
+  const currentStats: Stats = stats || {
+    todayPickupsCount: 0,
+    todayDeliveriesCount: 0,
+    inProgressCount: 0,
+    totalOutstanding: 0,
+    totalRevenue: 0,
+    todayPickups: [],
+    todayDeliveries: [],
+    recentOrders: []
+  };
 
   const getStatusBadge = (status: Order['status']) => {
     switch (status) {
@@ -82,7 +86,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="mt-4 flex items-baseline justify-between">
-            <div className="text-3xl font-black text-slate-900">{stats.todayPickupsCount}</div>
+            <div className="text-3xl font-black text-slate-900">{currentStats.todayPickupsCount}</div>
             <span className="text-xs font-bold text-blue-600 flex items-center gap-1">
               View schedule <ArrowUpRight className="w-3 h-3" />
             </span>
@@ -100,7 +104,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="mt-4 flex items-baseline justify-between">
-            <div className="text-3xl font-black text-slate-900">{stats.todayDeliveriesCount}</div>
+            <div className="text-3xl font-black text-slate-900">{currentStats.todayDeliveriesCount}</div>
             <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
               View schedule <ArrowUpRight className="w-3 h-3" />
             </span>
@@ -118,7 +122,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="mt-4 flex items-baseline justify-between">
-            <div className="text-3xl font-black text-slate-900">{stats.inProgressCount}</div>
+            <div className="text-3xl font-black text-slate-900">{currentStats.inProgressCount}</div>
             <span className="text-xs font-bold text-purple-600 flex items-center gap-1">
               Active workflow <ArrowUpRight className="w-3 h-3" />
             </span>
@@ -136,9 +140,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="mt-4 flex items-baseline justify-between">
-            <div className="text-3xl font-black text-slate-900">KSh {stats.totalOutstanding.toLocaleString()}</div>
+            <div className="text-3xl font-black text-slate-900">KSh {currentStats.totalOutstanding.toLocaleString()}</div>
             <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
-              Revenue: KSh {stats.totalRevenue.toLocaleString()} <ArrowUpRight className="w-3 h-3" />
+              Revenue: KSh {currentStats.totalRevenue.toLocaleString()} <ArrowUpRight className="w-3 h-3" />
             </span>
           </div>
         </div>
@@ -164,11 +168,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="space-y-4">
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Pickups Today</h3>
-              {stats.todayPickups.length === 0 ? (
+              {currentStats.todayPickups.length === 0 ? (
                 <p className="text-xs text-slate-500 italic bg-sky-50/50 p-4 rounded-2xl text-center">No pickups scheduled for today.</p>
               ) : (
                 <div className="space-y-2">
-                  {stats.todayPickups.map(order => (
+                  {currentStats.todayPickups.map(order => (
                     <div 
                       key={order.id}
                       onClick={() => onSelectOrder(order)}
@@ -196,11 +200,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <div className="pt-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Deliveries Today</h3>
-              {stats.todayDeliveries.length === 0 ? (
+              {currentStats.todayDeliveries.length === 0 ? (
                 <p className="text-xs text-slate-500 italic bg-sky-50/50 p-4 rounded-2xl text-center">No deliveries scheduled for today.</p>
               ) : (
                 <div className="space-y-2">
-                  {stats.todayDeliveries.map(order => (
+                  {currentStats.todayDeliveries.map(order => (
                     <div 
                       key={order.id}
                       onClick={() => onSelectOrder(order)}
@@ -245,7 +249,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="space-y-3">
-              {stats.recentOrders.map(order => (
+              {currentStats.recentOrders.map(order => (
                 <div 
                   key={order.id}
                   onClick={() => onSelectOrder(order)}

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Order, Driver, OrderStatus } from "../types";
-import { Truck, Phone, MapPin, CheckCircle, Clock, Navigation, Check, AlertCircle, Camera } from "lucide-react";
+import { Truck, Phone, MapPin, CheckCircle, Clock, Navigation, Check, AlertCircle, Camera, Map, X } from "lucide-react";
 
 interface DriverViewProps {
   orders: Order[];
@@ -16,6 +16,7 @@ export const DriverView: React.FC<DriverViewProps> = ({
   const [selectedDriverId, setSelectedDriverId] = useState<string>(drivers[0]?.id || "");
   const [proofNotes, setProofNotes] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'assigned' | 'completed'>('assigned');
+  const [showMapModal, setShowMapModal] = useState<boolean>(false);
 
   const currentDriver = drivers.find(d => d.id === selectedDriverId);
   const driverOrders = orders.filter(o => o.driverId === selectedDriverId);
@@ -38,20 +39,30 @@ export const DriverView: React.FC<DriverViewProps> = ({
   return (
     <div className="max-w-md mx-auto space-y-6 pb-12">
       {/* Driver Mobile Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-6 rounded-3xl shadow-lg">
+      <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs uppercase tracking-wider font-semibold bg-indigo-500/50 px-2.5 py-1 rounded-full">
             Driver Mobile App 📱
           </span>
-          <select
-            value={selectedDriverId}
-            onChange={(e) => setSelectedDriverId(e.target.value)}
-            className="bg-indigo-800 text-white border border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-medium focus:outline-none"
-          >
-            {drivers.map(d => (
-              <option key={d.id} value={d.id}>{d.name} ({d.vehicle})</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowMapModal(true)}
+              className="bg-indigo-800 hover:bg-indigo-900 text-white p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 border border-indigo-500/60 cursor-pointer shadow-xs transition-all"
+              title="View Route Map"
+            >
+              <Map className="w-4 h-4 text-indigo-200" />
+              <span className="hidden sm:inline">Route Map</span>
+            </button>
+            <select
+              value={selectedDriverId}
+              onChange={(e) => setSelectedDriverId(e.target.value)}
+              className="bg-indigo-800 text-white border border-indigo-500 rounded-xl px-3 py-1.5 text-xs font-medium focus:outline-none"
+            >
+              {drivers.map(d => (
+                <option key={d.id} value={d.id}>{d.name} ({d.vehicle})</option>
+              ))}
+            </select>
+          </div>
         </div>
         <h1 className="text-xl font-bold">{currentDriver?.name || 'Driver Portal'}</h1>
         <p className="text-xs text-indigo-100 mt-0.5">{currentDriver?.vehicle} • Status: {currentDriver?.status}</p>
@@ -200,6 +211,98 @@ export const DriverView: React.FC<DriverViewProps> = ({
           )
         )}
       </div>
+
+      {/* Map & Route Modal */}
+      {showMapModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600/30 flex items-center justify-center border border-indigo-500/40">
+                  <Map className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-base">Route Pickup Addresses</h2>
+                  <p className="text-xs text-slate-400">{assignedOrders.length} active stops assigned to {currentDriver?.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMapModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Placeholder Map View Box */}
+            <div className="relative bg-slate-100 h-48 border-b border-slate-200 flex items-center justify-center overflow-hidden">
+              <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#4f46e5_1px,transparent_1px)] [background-size:16px_16px]"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center p-4 bg-white/90 backdrop-blur-sm rounded-2xl shadow-sm border border-slate-200 max-w-xs">
+                  <Navigation className="w-8 h-8 text-indigo-600 mx-auto mb-2 animate-pulse" />
+                  <span className="text-xs font-bold text-slate-800 block">Live Route Map View</span>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">Displaying optimized stop locations for pickup & delivery</span>
+                </div>
+              </div>
+              {/* Simulated Map Pins */}
+              {assignedOrders.map((ord, idx) => (
+                <div
+                  key={ord.id}
+                  className="absolute w-8 h-8 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-md border-2 border-white"
+                  style={{
+                    top: `${20 + (idx * 25) % 60}%`,
+                    left: `${25 + (idx * 30) % 65}%`,
+                  }}
+                  title={`${ord.orderNumber}: ${ord.customerAddress}`}
+                >
+                  {idx + 1}
+                </div>
+              ))}
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-3 flex-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Pickup & Delivery Stops</h3>
+              {assignedOrders.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-6">No active stops found for this driver.</p>
+              ) : (
+                assignedOrders.map((ord, idx) => (
+                  <div key={ord.id} className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-slate-900">{ord.customerName}</span>
+                        <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{ord.orderNumber}</span>
+                      </div>
+                      <div className="flex items-start gap-1.5 text-xs text-slate-600 mt-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                        <p className="font-medium text-slate-800">{ord.customerAddress}</p>
+                      </div>
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
+                        <span>Window: {ord.status.includes('Delivery') ? ord.deliveryTimeWindow : ord.pickupTimeWindow}</span>
+                        <a href={`tel:${ord.customerPhone}`} className="text-indigo-600 font-semibold hover:underline flex items-center gap-1">
+                          <Phone className="w-3 h-3" /> {ord.customerPhone}
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setShowMapModal(false)}
+                className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm"
+              >
+                Close Map
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

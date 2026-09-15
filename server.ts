@@ -699,7 +699,8 @@ app.post("/api/orders", async (req, res) => {
 // Update order details, items, pricing, or weights after facility inspection
 app.put("/api/orders/:id", async (req, res) => {
   try {
-    const order = inMemoryOrders.find(o => o.id === req.params.id);
+    const orders = await getCollection<Order>("orders", inMemoryOrders);
+    const order = orders.find(o => o.id === req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
     const {
@@ -774,7 +775,7 @@ app.put("/api/orders/:id", async (req, res) => {
     }
 
     order.updatedAt = new Date().toISOString();
-    saveToFirestore("orders", order.id, order);
+    await saveToFirestore("orders", order.id, order);
     res.json(order);
   } catch (err: any) {
     console.error("[Orders] Update error:", err);
@@ -785,7 +786,8 @@ app.put("/api/orders/:id", async (req, res) => {
 app.patch("/api/orders/:id/status", async (req, res) => {
   try {
     const { status, proofOfDelivery, driverId } = req.body;
-    const order = inMemoryOrders.find(o => o.id === req.params.id);
+    const orders = await getCollection<Order>("orders", inMemoryOrders);
+    const order = orders.find(o => o.id === req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
     if (status) order.status = status;
@@ -802,7 +804,7 @@ app.patch("/api/orders/:id/status", async (req, res) => {
     }
     order.updatedAt = new Date().toISOString();
 
-    saveToFirestore("orders", order.id, order);
+    await saveToFirestore("orders", order.id, order);
     res.json(order);
   } catch (patchErr: any) {
     console.error("[Orders] Status patch error:", patchErr);
@@ -813,7 +815,8 @@ app.patch("/api/orders/:id/status", async (req, res) => {
 // Admin sends the pre-delivery invoice to the client
 app.post("/api/orders/:id/send-invoice", async (req, res) => {
   try {
-    const order = inMemoryOrders.find(o => o.id === req.params.id);
+    const orders = await getCollection<Order>("orders", inMemoryOrders);
+    const order = orders.find(o => o.id === req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
     const { customMessage } = req.body;
@@ -826,7 +829,7 @@ app.post("/api/orders/:id/send-invoice", async (req, res) => {
 
     const messageToSend = customMessage || defaultInvoiceMessage;
 
-    saveToFirestore("orders", order.id, order);
+    await saveToFirestore("orders", order.id, order);
     console.log(`[Sparkle Spins Pre-Delivery Invoice SMS] To ${order.customerPhone}: "${messageToSend}"`);
 
     res.json({
@@ -845,7 +848,8 @@ app.post("/api/orders/:id/send-invoice", async (req, res) => {
 app.post("/api/orders/:id/send-sms", async (req, res) => {
   try {
     const { customMessage } = req.body;
-    const order = inMemoryOrders.find(o => o.id === req.params.id);
+    const orders = await getCollection<Order>("orders", inMemoryOrders);
+    const order = orders.find(o => o.id === req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
     const riderPart = order.driverName ? ` Assigned Rider: ${order.driverName}.` : "";
@@ -878,43 +882,49 @@ app.get("/api/payments", async (req, res) => {
 });
 
 app.post("/api/payments", async (req, res) => {
-  const { orderId, amount, method, reference, notes } = req.body;
-  const order = inMemoryOrders.find(o => o.id === orderId);
-  if (!order) return res.status(404).json({ error: "Order not found" });
+  try {
+    const { orderId, amount, method, reference, notes } = req.body;
+    const orders = await getCollection<Order>("orders", inMemoryOrders);
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return res.status(404).json({ error: "Order not found" });
 
-  const payAmount = Number(amount);
-  if (isNaN(payAmount) || payAmount <= 0) {
-    return res.status(400).json({ error: "Invalid payment amount" });
+    const payAmount = Number(amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ error: "Invalid payment amount" });
+    }
+
+    const newPayment: Payment = {
+      id: "pay_" + Date.now(),
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      amount: payAmount,
+      method: method || "Cash",
+      reference: reference || "",
+      date: new Date().toISOString(),
+      notes: notes || ""
+    };
+
+    inMemoryPayments.unshift(newPayment);
+
+    order.amountPaid += payAmount;
+    order.balanceDue = Math.max(0, order.total - order.amountPaid);
+    if (order.balanceDue === 0) {
+      order.paymentStatus = "Paid";
+    } else if (order.amountPaid > 0) {
+      order.paymentStatus = "Partial";
+    } else {
+      order.paymentStatus = "Unpaid";
+    }
+    order.updatedAt = new Date().toISOString();
+
+    await saveToFirestore("payments", newPayment.id, newPayment);
+    await saveToFirestore("orders", order.id, order);
+    res.status(201).json({ payment: newPayment, order });
+  } catch (err: any) {
+    console.error("[Payments] Error:", err);
+    res.status(500).json({ error: err.message || "Failed to record payment" });
   }
-
-  const newPayment: Payment = {
-    id: "pay_" + Date.now(),
-    orderId: order.id,
-    orderNumber: order.orderNumber,
-    customerName: order.customerName,
-    amount: payAmount,
-    method: method || "Cash",
-    reference: reference || "",
-    date: new Date().toISOString(),
-    notes: notes || ""
-  };
-
-  inMemoryPayments.unshift(newPayment);
-
-  order.amountPaid += payAmount;
-  order.balanceDue = Math.max(0, order.total - order.amountPaid);
-  if (order.balanceDue === 0) {
-    order.paymentStatus = "Paid";
-  } else if (order.amountPaid > 0) {
-    order.paymentStatus = "Partial";
-  } else {
-    order.paymentStatus = "Unpaid";
-  }
-  order.updatedAt = new Date().toISOString();
-
-  saveToFirestore("payments", newPayment.id, newPayment);
-  saveToFirestore("orders", order.id, order);
-  res.status(201).json({ payment: newPayment, order });
 });
 
 // 7. Reports & Analytics

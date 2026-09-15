@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Lock, User, Shield, Truck, Sparkles, CheckCircle2, ArrowLeft, ShoppingBag } from "lucide-react";
+import { Lock, User, Shield, Truck, Sparkles, CheckCircle2, ArrowLeft, ShoppingBag, Eye, EyeOff } from "lucide-react";
 
 interface LoginScreenProps {
   onLoginSuccess: (user: { role: 'admin' | 'driver'; username: string; name: string; driverId?: string }) => void;
@@ -10,7 +10,8 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, drivers, onGoToCustomerPage }) => {
   const [role, setRole] = useState<'admin' | 'driver'>('admin');
   const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -101,7 +102,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, driver
             onClick={() => {
               setRole('admin');
               setUsername('admin');
-              setPassword('admin123');
+              setPassword('');
               setError('');
             }}
             className={`py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
@@ -116,7 +117,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, driver
             onClick={() => {
               setRole('driver');
               setUsername('maina');
-              setPassword('rider123');
+              setPassword('');
               setError('');
             }}
             className={`py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
@@ -164,13 +165,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, driver
                 <Lock className="w-4 h-4" />
               </span>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Enter password"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 

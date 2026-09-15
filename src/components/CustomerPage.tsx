@@ -186,16 +186,16 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-blue-100 selection:text-blue-900">
       {/* Operations Quick Access Bar */}
-      <div className="bg-slate-900 text-slate-300 text-[11px] py-1.5 px-4 border-b border-slate-800">
+      <div className="bg-slate-900 text-slate-300 text-[11px] py-1 px-4 border-b border-slate-800">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Sparkle Spins • Doorstep Laundry & Garment Care in Nairobi Environs</span>
+          <div className="flex items-center gap-2 truncate">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="truncate">Sparkle Spins • Doorstep Laundry & Garment Care</span>
           </div>
           <button
             type="button"
             onClick={onGoToDashboard || onGoToLogin}
-            className="text-blue-300 hover:text-white font-bold transition-colors cursor-pointer flex items-center gap-1 text-[11px]"
+            className="text-blue-300 hover:text-white font-bold transition-colors cursor-pointer flex items-center gap-1 text-[11px] shrink-0 ml-2"
           >
             Operations & Staff Dashboard &rarr;
           </button>
@@ -204,38 +204,38 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
 
       {/* Top Banner Navigation */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xl shadow-md shadow-blue-500/20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-base shadow-xs shadow-blue-500/20">
               ✨
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-slate-900 text-lg tracking-tight">Sparkle Spins</span>
-                <span className="text-[11px] font-bold uppercase bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
-                  Customer Portal
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-slate-900 text-base tracking-tight leading-none">Sparkle Spins</span>
+                <span className="text-[10px] font-bold uppercase bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full border border-blue-200">
+                  Client Portal
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium">Doorstep Laundry & Garment Care</p>
+              <p className="text-[10px] text-slate-500 font-medium leading-tight">Doorstep Laundry & Garment Care</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-2.5">
             <a
               href="#book-order"
-              className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors px-2.5 py-1.5"
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors px-2 py-1"
             >
               Book Pickup
             </a>
             <a
               href="#how-it-works"
-              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2.5 py-1.5"
+              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2 py-1"
             >
               How It Works
             </a>
             <a
               href="#reviews"
-              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2.5 py-1.5"
+              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2 py-1"
             >
               Testimonials
             </a>
@@ -243,7 +243,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
             <button
               type="button"
               onClick={onGoToDashboard || onGoToLogin}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Truck className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Operations</span> Dashboard
@@ -253,7 +253,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               <button
                 type="button"
                 onClick={onBackToDashboard}
-                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer"
               >
                 <ArrowRight className="w-3.5 h-3.5" />
                 Staff ({currentUserRole})
@@ -262,7 +262,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               <button
                 type="button"
                 onClick={onGoToLogin}
-                className="hidden md:inline-flex bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer items-center gap-1"
+                className="hidden md:inline-flex bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer items-center gap-1"
               >
                 <LogIn className="w-3.5 h-3.5 text-slate-500" />
                 Staff Login
@@ -273,35 +273,38 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
       </header>
 
       {/* 1. Schedule a Laundry Pickup (COMES FIRST) */}
-      <section id="book-order" className="py-8 sm:py-10 max-w-6xl mx-auto px-4 sm:px-6 w-full">
-        {/* Banner with Value Propositions & Trust Metrics */}
-        <div className="mb-8 text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 bg-blue-100/80 text-blue-800 text-xs font-semibold px-3.5 py-1 rounded-full border border-blue-200">
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+      <section id="book-order" className="pt-2 sm:pt-3 pb-8 max-w-6xl mx-auto px-4 sm:px-6 w-full">
+        {/* Compact Hero Header - puts form front and center */}
+        <div className="mb-3.5 sm:mb-4 text-center max-w-3xl mx-auto space-y-1">
+          <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-blue-200/80">
+            <Sparkles className="w-3 h-3 text-blue-600" />
             Doorstep Laundry & Garment Care • Book in under 60 seconds
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight">
             Schedule a Laundry Pickup
           </h1>
 
-          <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
+          <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto">
             Choose your collection address, laundry items, and convenient pickup window. Pay on delivery (M-Pesa or Cash).
           </p>
 
-          {/* Key Trust Highlights */}
-          <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 pt-2 text-xs font-bold text-slate-700">
-            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
-              <Truck className="w-4 h-4 text-emerald-600" /> Free Doorstep Collection
+          {/* Inline Trust Highlights - sleek single row */}
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-0.5 text-[11px] font-semibold text-slate-600">
+            <span className="inline-flex items-center gap-1 text-slate-700">
+              <Truck className="w-3.5 h-3.5 text-emerald-600" /> Free Collection
             </span>
-            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
-              <Clock className="w-4 h-4 text-blue-600" /> 24h - 48h Turnaround
+            <span className="text-slate-300 hidden sm:inline">•</span>
+            <span className="inline-flex items-center gap-1 text-slate-700">
+              <Clock className="w-3.5 h-3.5 text-blue-600" /> 24h - 48h Turnaround
             </span>
-            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
-              <HeartHandshake className="w-4 h-4 text-indigo-600" /> Pay on Delivery
+            <span className="text-slate-300 hidden sm:inline">•</span>
+            <span className="inline-flex items-center gap-1 text-slate-700">
+              <HeartHandshake className="w-3.5 h-3.5 text-indigo-600" /> Pay on Delivery
             </span>
-            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
-              <ShieldCheck className="w-4 h-4 text-amber-500" /> 4.9★ Customer Rating
+            <span className="text-slate-300 hidden sm:inline">•</span>
+            <span className="inline-flex items-center gap-1 text-slate-700">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-500" /> 4.9★ Customer Rating
             </span>
           </div>
         </div>
@@ -382,13 +385,13 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmitOrder} className="grid lg:grid-cols-12 gap-8">
+          <form onSubmit={handleSubmitOrder} className="grid lg:grid-cols-12 gap-5">
             {/* Left Column: Customer Details & Schedule */}
-            <div className="lg:col-span-7 space-y-6">
+            <div className="lg:col-span-7 space-y-4">
               {/* Step 1: Contact Details */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-                  <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5">
+                  <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
                     1
                   </div>
                   <div>
@@ -397,38 +400,38 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-3.5">
+                <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Full Name <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
-                      <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
                         required
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
                         placeholder="e.g. Wanjiku Mwangi"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                       />
                     </div>
                   </div>
 
-                  <div className="grid sm:grid-cols-2 gap-3.5">
+                  <div className="grid sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
                         Phone Number (M-Pesa / Calls) <span className="text-rose-500">*</span>
                       </label>
                       <div className="relative">
-                        <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                           type="tel"
                           required
                           value={customerPhone}
                           onChange={(e) => setCustomerPhone(e.target.value)}
                           placeholder="e.g. +254 712 345678"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                         />
                       </div>
                     </div>
@@ -438,14 +441,14 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                         Neighborhood / Estate <span className="text-rose-500">*</span>
                       </label>
                       <div className="relative">
-                        <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                           type="text"
                           required
                           value={customerAddress}
                           onChange={(e) => setCustomerAddress(e.target.value)}
                           placeholder="e.g. Kilimani, Rose Ave, Apt 4B"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                         />
                       </div>
                     </div>
@@ -459,17 +462,17 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                       rows={2}
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="e.g. Gate code #3321, please call before entering, separate delicate fabrics"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white resize-none"
+                      placeholder="e.g. Gate code #3321, please call before entering, delicate fabrics"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white resize-none"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Step 2: Scheduling Time Slots */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-                  <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5">
+                  <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
                     2
                   </div>
                   <div>
@@ -478,9 +481,9 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid sm:grid-cols-2 gap-3.5">
                   {/* Pickup */}
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-blue-600" /> Pickup Date
                     </label>
@@ -489,15 +492,15 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                       value={pickupDate}
                       min={todayStr}
                       onChange={(e) => setPickupDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <label className="block text-[11px] font-semibold text-slate-500 mt-2">
+                    <label className="block text-[11px] font-semibold text-slate-500 mt-1">
                       Pickup Window
                     </label>
                     <select
                       value={pickupTimeWindow}
                       onChange={(e) => setPickupTimeWindow(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       {timeSlots.map(slot => (
                         <option key={`pick-${slot}`} value={slot}>{slot}</option>
@@ -506,7 +509,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   </div>
 
                   {/* Delivery */}
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Preferred Delivery Date
                     </label>
@@ -515,16 +518,15 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                       value={deliveryDate}
                       min={pickupDate}
                       onChange={(e) => setDeliveryDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                    </input>
-                    <label className="block text-[11px] font-semibold text-slate-500 mt-2">
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <label className="block text-[11px] font-semibold text-slate-500 mt-1">
                       Delivery Window
                     </label>
                     <select
                       value={deliveryTimeWindow}
                       onChange={(e) => setDeliveryTimeWindow(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       {timeSlots.map(slot => (
                         <option key={`del-${slot}`} value={slot}>{slot}</option>
@@ -535,14 +537,14 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               </div>
 
               {/* Pricing & Weighing Transparency Card */}
-              <div className="bg-gradient-to-br from-blue-50/70 to-indigo-50/40 rounded-2xl border border-blue-200/80 p-5 space-y-3 shadow-2xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+              <div className="bg-gradient-to-br from-blue-50/70 to-indigo-50/40 rounded-2xl border border-blue-200/80 p-4 space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
                     ⚖️
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-sm">Post-Pickup Weighing & Transparent Pricing</h3>
-                    <p className="text-[11px] text-slate-600">No guesswork required when booking online</p>
+                    <h3 className="font-bold text-slate-900 text-xs sm:text-sm">Post-Pickup Weighing & Transparent Pricing</h3>
+                    <p className="text-[10px] sm:text-[11px] text-slate-600">No guesswork required when booking online</p>
                   </div>
                 </div>
 
@@ -550,21 +552,21 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   Prices are not charged upfront. Our rider collects your laundry bags from your doorstep. At our facility, specialists sort, inspect, and weigh your items on precision scales. You will receive an official itemized <strong>SMS invoice</strong> with the exact verified total before delivery.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                  <div className="bg-white/80 border border-blue-100 p-2.5 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Step 1</span>
-                    <strong className="text-xs text-slate-800 block mt-0.5">Free Collection</strong>
-                    <span className="text-[10px] text-slate-500">Rider picks up your bags</span>
+                <div className="grid grid-cols-3 gap-2 pt-0.5">
+                  <div className="bg-white/80 border border-blue-100 p-2 rounded-xl text-center">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block">Step 1</span>
+                    <strong className="text-[11px] text-slate-800 block">Free Pickup</strong>
+                    <span className="text-[9px] text-slate-500">At your door</span>
                   </div>
-                  <div className="bg-white/80 border border-blue-100 p-2.5 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Step 2</span>
-                    <strong className="text-xs text-slate-800 block mt-0.5">Weigh at Facility</strong>
-                    <span className="text-[10px] text-slate-500">Items weighed & checked</span>
+                  <div className="bg-white/80 border border-blue-100 p-2 rounded-xl text-center">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block">Step 2</span>
+                    <strong className="text-[11px] text-slate-800 block">Facility Weigh</strong>
+                    <span className="text-[9px] text-slate-500">Precision scales</span>
                   </div>
-                  <div className="bg-white/80 border border-blue-100 p-2.5 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Step 3</span>
-                    <strong className="text-xs text-slate-800 block mt-0.5">SMS Invoice Sent</strong>
-                    <span className="text-[10px] text-slate-500">Pay on delivery (M-Pesa)</span>
+                  <div className="bg-white/80 border border-blue-100 p-2 rounded-xl text-center">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block">Step 3</span>
+                    <strong className="text-[11px] text-slate-800 block">SMS Invoice</strong>
+                    <span className="text-[9px] text-slate-500">Pay on delivery</span>
                   </div>
                 </div>
               </div>
@@ -572,13 +574,13 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
 
             {/* Right Column: Pickup Request Summary & Placement Button */}
             <div className="lg:col-span-5">
-              <div className="sticky top-24 bg-white rounded-2xl border border-slate-200 p-6 shadow-md shadow-slate-200/50 space-y-5">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+              <div className="sticky top-16 bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-md shadow-slate-200/50 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-blue-600" />
                     Pickup Request Summary
                   </h3>
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     Free Collection
                   </span>
                 </div>
@@ -591,26 +593,26 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 )}
 
                 {/* Booking Key Info */}
-                <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
-                  <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-2">
+                <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-xs">
+                  <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-1.5">
                     <span className="text-slate-500 font-medium">Customer:</span>
                     <span className="font-bold text-slate-900 text-right">
                       {customerName.trim() || <span className="text-slate-400 font-normal italic">Enter your name</span>}
                     </span>
                   </div>
-                  <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-2">
+                  <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-1.5">
                     <span className="text-slate-500 font-medium">Phone for SMS:</span>
                     <span className="font-bold text-slate-900 text-right">
                       {customerPhone.trim() || <span className="text-slate-400 font-normal italic">Enter phone number</span>}
                     </span>
                   </div>
-                  <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-2">
+                  <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-1.5">
                     <span className="text-slate-500 font-medium">Pickup Location:</span>
                     <span className="font-bold text-slate-900 text-right max-w-[180px] truncate">
                       {customerAddress.trim() || <span className="text-slate-400 font-normal italic">Enter address/estate</span>}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                  <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5">
                     <span className="text-slate-500 font-medium">Scheduled Pickup:</span>
                     <span className="font-bold text-blue-700">{pickupDate} ({pickupTimeWindow})</span>
                   </div>
@@ -621,41 +623,41 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 </div>
 
                 {/* Pre-Delivery Invoicing Notice Card */}
-                <div className="bg-blue-50/90 rounded-2xl p-4 space-y-3 text-xs border border-blue-200">
-                  <div className="flex items-center gap-2 font-black text-blue-950 text-sm">
-                    <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                <div className="bg-blue-50/90 rounded-xl p-3 space-y-1.5 text-xs border border-blue-200">
+                  <div className="flex items-center gap-1.5 font-bold text-blue-950 text-xs sm:text-sm">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                     <span>How Payment & Invoicing Works</span>
                   </div>
-                  <div className="space-y-2 text-slate-700 text-xs leading-relaxed">
-                    <div className="flex items-start gap-2">
+                  <div className="space-y-1 text-slate-700 text-[11px] leading-relaxed">
+                    <div className="flex items-start gap-1.5">
                       <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Free Doorstep Collection:</strong> No pickup or bag collection fees.</span>
+                      <span><strong>Free Collection:</strong> No pickup or collection bag charges.</span>
                     </div>
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-1.5">
                       <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                      <span><strong>Weighed by Admin at Facility:</strong> Laundry is weighed & priced accurately upon arrival.</span>
+                      <span><strong>Accurate Weighing:</strong> Checked & weighed on calibrated facility scales.</span>
                     </div>
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-1.5">
                       <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                      <span><strong>Itemized SMS Invoice:</strong> An SMS with full price breakdown will be sent directly to your phone.</span>
+                      <span><strong>Itemized SMS Invoice:</strong> Exact breakdown texted before return.</span>
                     </div>
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-1.5">
                       <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Pay on Delivery:</strong> Inspect your fresh clothes and pay via M-Pesa or Cash.</span>
+                      <span><strong>Pay on Delivery:</strong> Inspect garments & pay via M-Pesa or Cash.</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Amount Due at Booking */}
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
+                <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
                   <span className="text-xs font-bold text-emerald-900">Due at Booking:</span>
-                  <span className="text-sm font-black text-emerald-700">KSh 0 (Pay on Delivery)</span>
+                  <span className="text-xs sm:text-sm font-black text-emerald-700">KSh 0 (Pay on Delivery)</span>
                 </div>
 
                 <button
                   type="submit"
                   disabled={submittingOrder}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 px-4 rounded-xl text-sm transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 sm:py-3 px-4 rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 >
                   {submittingOrder ? (
                     <>
@@ -669,8 +671,8 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   )}
                 </button>
 
-                <p className="text-[11px] text-center text-slate-400 font-medium">
-                  Uniformed rider • SMS invoice after weighing • Pay on delivery
+                <p className="text-[10px] text-center text-slate-400 font-medium">
+                  SMS invoice sent after facility weighing • Pay on delivery
                 </p>
               </div>
             </div>

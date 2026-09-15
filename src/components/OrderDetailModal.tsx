@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Order, Driver, OrderStatus, ServiceItem, OrderItem } from "../types";
+import { generateWhatsAppMessage, openWhatsAppChat } from "../utils/whatsapp";
 import {
   Truck,
   Phone,
@@ -87,6 +88,22 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const [smsError, setSmsError] = useState<string | null>(null);
 
   const assignedDriver = drivers.find(d => d.id === driverId) || (order.driverName ? { name: order.driverName } : null);
+
+  // WhatsApp notification state (auto-placed when status changes to Ready for Delivery)
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState<boolean>(order.status === 'Ready for Delivery');
+  const [whatsappMessage, setWhatsappMessage] = useState<string>(
+    generateWhatsAppMessage(order, order.status, assignedDriver?.name)
+  );
+  const [whatsappSentSuccess, setWhatsappSentSuccess] = useState<boolean>(false);
+
+  const handleStatusChange = (newStatus: OrderStatus) => {
+    setStatus(newStatus);
+    const msg = generateWhatsAppMessage(order, newStatus, assignedDriver?.name);
+    setWhatsappMessage(msg);
+    if (newStatus === 'Ready for Delivery') {
+      setShowWhatsAppDialog(true);
+    }
+  };
 
   // Generate standard pre-delivery invoice text
   const itemsText = order.items.length > 0
@@ -744,6 +761,16 @@ Thank you for choosing Sparkle Spins!`;
               </button>
 
               <button
+                type="button"
+                onClick={() => setShowWhatsAppDialog(prev => !prev)}
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                title="Send WhatsApp Notification"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                WhatsApp
+              </button>
+
+              <button
                 onClick={() => {
                   onClose();
                   onOpenPaymentModal(order);
@@ -754,6 +781,65 @@ Thank you for choosing Sparkle Spins!`;
               </button>
             </div>
           </div>
+
+          {/* WhatsApp Notification Dialog */}
+          {showWhatsAppDialog && (
+            <div className="p-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50/70 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                  <span className="text-base">🟢</span>
+                  <span>WhatsApp Notification (Ready for Delivery / Status Update)</span>
+                </div>
+                <span className="text-xs text-slate-500">{order.customerPhone}</span>
+              </div>
+
+              {whatsappSentSuccess ? (
+                <div className="p-3 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>WhatsApp message successfully dispatched / opened for {order.customerName}!</span>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-[11px] font-bold text-emerald-800 block mb-1">
+                      Pre-composed WhatsApp Template (Auto-placed when status is Ready for Delivery):
+                    </label>
+                    <textarea
+                      rows={5}
+                      value={whatsappMessage}
+                      onChange={(e) => setWhatsappMessage(e.target.value)}
+                      className="w-full text-xs font-mono p-3 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-slate-800 leading-relaxed resize-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowWhatsAppDialog(false)}
+                      className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openWhatsAppChat(order.customerPhone, whatsappMessage);
+                        setWhatsappSentSuccess(true);
+                        setTimeout(() => {
+                          setShowWhatsAppDialog(false);
+                          setWhatsappSentSuccess(false);
+                        }, 2000);
+                      }}
+                      className="px-4 py-2 text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Press to Send WhatsApp Message
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* General SMS Dialog */}
           {showSmsDialog && (
@@ -823,7 +909,7 @@ Thank you for choosing Sparkle Spins!`;
                 <label className="block text-xs font-bold text-slate-700 mb-1">Order Status</label>
                 <select
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as OrderStatus)}
+                  onChange={(e) => handleStatusChange(e.target.value as OrderStatus)}
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
                 >
                   {ALL_STATUSES.map(s => (

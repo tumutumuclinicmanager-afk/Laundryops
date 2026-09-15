@@ -624,21 +624,13 @@ app.post("/api/orders", async (req, res) => {
     }
 
     const services = await getCollection<ServiceItem>("services", inMemoryServices);
-    let itemsToProcess = Array.isArray(items) && items.length > 0 ? items : [
-      {
-        serviceId: services[0]?.id || "s1",
-        serviceName: services[0]?.name || "Wash & Fold (Standard)",
-        unit: services[0]?.unit || "kg",
-        quantity: 5,
-        unitPrice: services[0]?.price || 150
-      }
-    ];
+    let itemsToProcess = Array.isArray(items) ? items : [];
 
     let subtotal = 0;
     const processedItems: OrderItem[] = itemsToProcess.map((item: any) => {
       const sItem = services.find(s => s.id === item.serviceId);
       const unitPrice = sItem ? sItem.price : (Number(item.unitPrice) || 0);
-      const qty = Math.max(1, Number(item.quantity) || 1);
+      const qty = Math.max(0.1, Number(item.quantity) || 1);
       const itemSubtotal = unitPrice * qty;
       subtotal += itemSubtotal;
       return {

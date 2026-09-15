@@ -89,9 +89,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const assignedDriver = drivers.find(d => d.id === driverId) || (order.driverName ? { name: order.driverName } : null);
 
   // Generate standard pre-delivery invoice text
-  const itemsText = order.items
-    .map(it => `• ${it.serviceName} (${it.quantity} ${it.unit}): KSh ${it.subtotal.toLocaleString()}`)
-    .join("\n");
+  const itemsText = order.items.length > 0
+    ? order.items.map(it => `• ${it.serviceName} (${it.quantity} ${it.unit}): KSh ${it.subtotal.toLocaleString()}`).join("\n")
+    : "• Pending facility weighing & itemization";
 
   const defaultInvoiceSmsText = `✨ Sparkle Spins PRE-DELIVERY INVOICE
 Order: ${order.orderNumber}
@@ -366,7 +366,15 @@ Thank you for choosing Sparkle Spins!`;
 
             {!order.invoiceSent && (
               <p className="text-xs text-amber-900 leading-relaxed bg-white/70 p-2.5 rounded-xl border border-amber-200">
-                Because the customer selected items without seeing final prices during booking, send this invoice now so they inspect their exact bill (Total: <strong>KSh {order.total.toLocaleString()}</strong>) prior to rider arrival.
+                {order.items.length === 0 ? (
+                  <>
+                    ⚠️ The client placed a doorstep pickup order without upfront pricing. <strong>Please click &quot;Weigh / Edit Items &amp; Price&quot; below</strong> to enter the measured weights, services, and final price before dispatching the invoice SMS.
+                  </>
+                ) : (
+                  <>
+                    The client placed this order without seeing final prices. Send this invoice now so they inspect their exact bill (Total: <strong>KSh {order.total.toLocaleString()}</strong>) prior to rider arrival.
+                  </>
+                )}
               </p>
             )}
 
@@ -535,7 +543,22 @@ Thank you for choosing Sparkle Spins!`;
 
               <button
                 type="button"
-                onClick={() => setIsEditingItems(prev => !prev)}
+                onClick={() => {
+                  if (!isEditingItems && editableItems.length === 0) {
+                    const defaultService = services[0];
+                    setEditableItems([
+                      {
+                        serviceId: defaultService?.id || "custom",
+                        serviceName: defaultService?.name || "Wash & Fold (Standard Bag)",
+                        unit: defaultService?.unit || "kg",
+                        quantity: 1,
+                        unitPrice: defaultService?.price || 150,
+                        subtotal: defaultService?.price || 150
+                      }
+                    ]);
+                  }
+                  setIsEditingItems(prev => !prev);
+                }}
                 className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
                   isEditingItems
                     ? "bg-slate-900 text-white border-slate-900"
@@ -670,14 +693,25 @@ Thank you for choosing Sparkle Spins!`;
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200/60">
-                    {order.items.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-100/40">
-                        <td className="py-2.5 px-3.5 font-bold text-slate-900">{item.serviceName}</td>
-                        <td className="py-2.5 px-3 text-center text-slate-700 font-medium">{item.quantity} {item.unit}</td>
-                        <td className="py-2.5 px-3 text-right text-slate-500">KSh {item.unitPrice.toLocaleString()}</td>
-                        <td className="py-2.5 px-3.5 text-right font-black text-slate-900">KSh {item.subtotal.toLocaleString()}</td>
+                    {order.items.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-6 px-3.5 text-center text-slate-500">
+                          <p className="font-bold text-amber-700 mb-1">⚠️ Items pending pickup &amp; weighing</p>
+                          <p className="text-[11px] text-slate-500">
+                            The customer scheduled a pickup without pricing. Click &quot;Weigh / Edit Items &amp; Price&quot; above to add weighed laundry bags or dry cleaning items.
+                          </p>
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      order.items.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-100/40">
+                          <td className="py-2.5 px-3.5 font-bold text-slate-900">{item.serviceName}</td>
+                          <td className="py-2.5 px-3 text-center text-slate-700 font-medium">{item.quantity} {item.unit}</td>
+                          <td className="py-2.5 px-3 text-right text-slate-500">KSh {item.unitPrice.toLocaleString()}</td>
+                          <td className="py-2.5 px-3.5 text-right font-black text-slate-900">KSh {item.subtotal.toLocaleString()}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

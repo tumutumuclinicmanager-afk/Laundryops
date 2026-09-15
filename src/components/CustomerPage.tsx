@@ -72,8 +72,6 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
   const [deliveryDate, setDeliveryDate] = useState(defaultDeliveryDate);
   const [deliveryTimeWindow, setDeliveryTimeWindow] = useState("02:00 PM - 04:00 PM");
 
-  // Selected items: map serviceId -> quantity (Default to 1 item of first service so order is ready)
-  const [quantities, setQuantities] = useState<Record<string, number>>({ "s1": 1 });
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [orderError, setOrderError] = useState("");
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
@@ -97,57 +95,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
     "05:00 PM - 07:00 PM"
   ];
 
-  // Helper to adjust item quantity
-  const handleQuantityChange = (serviceId: string, delta: number) => {
-    setQuantities(prev => {
-      const current = prev[serviceId] || 0;
-      const next = Math.max(0, current + delta);
-      if (next === 0) {
-        const copy = { ...prev };
-        delete copy[serviceId];
-        return copy;
-      }
-      return { ...prev, [serviceId]: next };
-    });
-  };
-
-  // Quick preset loader
-  const handleApplyPreset = (presetName: string) => {
-    const updated: Record<string, number> = { ...quantities };
-    if (presetName === "wash_bag") {
-      const s = availableServices.find(item => item.name.toLowerCase().includes("wash & fold")) || availableServices[0];
-      if (s) updated[s.id] = (updated[s.id] || 0) + 1;
-    } else if (presetName === "wash_fold_5kg") {
-      const s = availableServices.find(item => item.name.toLowerCase().includes("wash & fold") && !item.name.toLowerCase().includes("heavy")) || availableServices[0];
-      if (s) updated[s.id] = (updated[s.id] || 0) + 5;
-    } else if (presetName === "suits_dryclean") {
-      const s = availableServices.find(item => item.name.toLowerCase().includes("suit")) || availableServices[1] || availableServices[0];
-      if (s) updated[s.id] = (updated[s.id] || 0) + 2;
-    } else if (presetName === "duvet") {
-      const s = availableServices.find(item => item.name.toLowerCase().includes("duvet") || item.name.toLowerCase().includes("comforter")) || availableServices[availableServices.length - 1];
-      if (s) updated[s.id] = (updated[s.id] || 0) + 1;
-    }
-    setQuantities(updated);
-  };
-
-  // Calculate items list
-  const selectedItemsList = Object.entries(quantities)
-    .filter(([_, qty]) => Number(qty) > 0)
-    .map(([serviceId, qty]) => {
-      const numQty = Number(qty);
-      const service = availableServices.find(s => s.id === serviceId);
-      const unitPrice = service?.price || 150;
-      return {
-        serviceId,
-        serviceName: service?.name || "General Laundry Care",
-        unit: service?.unit || "bag",
-        quantity: numQty,
-        unitPrice,
-        subtotal: unitPrice * numQty
-      };
-    });
-
-  // Handle Order Submit
+  // Handle Order Submit (pricing determined by admin after pickup & weighing)
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setOrderError("");
@@ -155,20 +103,6 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
     if (!customerName.trim() || !customerPhone.trim() || !customerAddress.trim()) {
       setOrderError("Please enter your name, phone number, and pickup address.");
       return;
-    }
-
-    // Resilient fallback if user unchecked all items: default to 1 laundry bag
-    let itemsToSubmit = selectedItemsList;
-    if (itemsToSubmit.length === 0) {
-      const defaultS = availableServices[0] || FALLBACK_SERVICES[0];
-      itemsToSubmit = [{
-        serviceId: defaultS.id,
-        serviceName: defaultS.name,
-        unit: defaultS.unit,
-        quantity: 1,
-        unitPrice: defaultS.price,
-        subtotal: defaultS.price
-      }];
     }
 
     setSubmittingOrder(true);
@@ -182,14 +116,13 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
         deliveryDate,
         deliveryTimeWindow,
         notes: notes.trim(),
-        items: itemsToSubmit
+        items: [] // Price and items set by admin after facility pickup & weighing
       };
 
       const created = await onPlaceOrder(orderPayload);
       if (created) {
         setConfirmedOrder(created);
         setReviewName(customerName);
-        setQuantities({ "s1": 1 });
         setNotes("");
         // Scroll to top of confirmation
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -295,10 +228,10 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               Book Pickup
             </a>
             <a
-              href="#services"
+              href="#how-it-works"
               className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2.5 py-1.5"
             >
-              Services
+              How It Works
             </a>
             <a
               href="#reviews"
@@ -601,115 +534,52 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 </div>
               </div>
 
-              {/* Step 3: Choose Services */}
-              <div id="services" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                      3
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-sm">Select Laundry Services</h3>
-                      <p className="text-[11px] text-slate-500">Choose what you need cleaned & pressed</p>
-                    </div>
+              {/* Pricing & Weighing Transparency Card */}
+              <div className="bg-gradient-to-br from-blue-50/70 to-indigo-50/40 rounded-2xl border border-blue-200/80 p-5 space-y-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                    ⚖️
                   </div>
-
-                  {/* Quick Preset Buttons */}
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase mr-1">Quick Select:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleApplyPreset("wash_bag")}
-                      className="text-[11px] font-medium bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 cursor-pointer"
-                    >
-                      +1 Laundry Bag
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleApplyPreset("wash_fold_5kg")}
-                      className="text-[11px] font-medium bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 cursor-pointer"
-                    >
-                      +5kg Wash
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleApplyPreset("suits_dryclean")}
-                      className="text-[11px] font-medium bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-200 hover:bg-indigo-100 cursor-pointer"
-                    >
-                      +2 Suits
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleApplyPreset("duvet")}
-                      className="text-[11px] font-medium bg-purple-50 text-purple-700 px-2.5 py-1 rounded-md border border-purple-200 hover:bg-purple-100 cursor-pointer"
-                    >
-                      +1 Duvet
-                    </button>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">Post-Pickup Weighing & Transparent Pricing</h3>
+                    <p className="text-[11px] text-slate-600">No guesswork required when booking online</p>
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {availableServices.map(service => {
-                    const count = quantities[service.id] || 0;
-                    return (
-                      <div
-                        key={service.id}
-                        className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between ${
-                          count > 0 ? "border-blue-500 bg-blue-50/40 shadow-xs" : "border-slate-200 bg-slate-50/40 hover:border-slate-300"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start gap-2">
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                              {service.category}
-                            </span>
-                            <h4 className="font-bold text-xs sm:text-sm text-slate-900 mt-0.5">{service.name}</h4>
-                          </div>
-                          <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
-                            Billed per {service.unit}
-                          </span>
-                        </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Prices are not charged upfront. Our rider collects your laundry bags from your doorstep. At our facility, specialists sort, inspect, and weigh your items on precision scales. You will receive an official itemized <strong>SMS invoice</strong> with the exact verified total before delivery.
+                </p>
 
-                        <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
-                          <span className="text-xs text-slate-600 font-medium">
-                            {count > 0 ? `${count} ${service.unit}${count > 1 && service.unit === 'item' ? 's' : ''} selected` : "Select quantity"}
-                          </span>
-                          <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 p-0.5 shadow-2xs">
-                            <button
-                              type="button"
-                              onClick={() => handleQuantityChange(service.id, -1)}
-                              disabled={count === 0}
-                              className="w-6 h-6 flex items-center justify-center rounded text-slate-600 hover:bg-slate-100 disabled:opacity-30 cursor-pointer"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="w-6 text-center text-xs font-bold text-slate-900">{count}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleQuantityChange(service.id, 1)}
-                              className="w-6 h-6 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                  <div className="bg-white/80 border border-blue-100 p-2.5 rounded-xl text-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Step 1</span>
+                    <strong className="text-xs text-slate-800 block mt-0.5">Free Collection</strong>
+                    <span className="text-[10px] text-slate-500">Rider picks up your bags</span>
+                  </div>
+                  <div className="bg-white/80 border border-blue-100 p-2.5 rounded-xl text-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Step 2</span>
+                    <strong className="text-xs text-slate-800 block mt-0.5">Weigh at Facility</strong>
+                    <span className="text-[10px] text-slate-500">Items weighed & checked</span>
+                  </div>
+                  <div className="bg-white/80 border border-blue-100 p-2.5 rounded-xl text-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Step 3</span>
+                    <strong className="text-xs text-slate-800 block mt-0.5">SMS Invoice Sent</strong>
+                    <span className="text-[10px] text-slate-500">Pay on delivery (M-Pesa)</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Order Summary & Placement Button */}
+            {/* Right Column: Pickup Request Summary & Placement Button */}
             <div className="lg:col-span-5">
               <div className="sticky top-24 bg-white rounded-2xl border border-slate-200 p-6 shadow-md shadow-slate-200/50 space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                    <ShoppingBag className="w-4 h-4 text-blue-600" />
-                    Order Summary
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    Pickup Request Summary
                   </h3>
-                  <span className="text-xs text-slate-400">
-                    {selectedItemsList.length} item{selectedItemsList.length === 1 ? '' : 's'}
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    Free Collection
                   </span>
                 </div>
 
@@ -720,56 +590,66 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   </div>
                 )}
 
-                {selectedItemsList.length === 0 ? (
-                  <div className="py-8 text-center text-slate-400 space-y-2 border-2 border-dashed border-slate-200 rounded-xl">
-                    <ShoppingBag className="w-8 h-8 mx-auto text-slate-300" />
-                    <p className="text-xs font-medium">No services selected yet</p>
-                    <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                      Click the <strong className="text-slate-600">+</strong> button on services on the left to add items.
-                    </p>
+                {/* Booking Key Info */}
+                <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
+                  <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-2">
+                    <span className="text-slate-500 font-medium">Customer:</span>
+                    <span className="font-bold text-slate-900 text-right">
+                      {customerName.trim() || <span className="text-slate-400 font-normal italic">Enter your name</span>}
+                    </span>
                   </div>
-                ) : (
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {selectedItemsList.map((item) => (
-                      <div key={item.serviceId} className="flex justify-between items-center text-xs py-2 border-b border-slate-100">
-                        <div>
-                          <span className="font-bold text-slate-800 text-xs sm:text-sm block">{item.serviceName}</span>
-                          <span className="text-[11px] text-slate-400">
-                            Quantity requested: {item.quantity} {item.unit}{item.quantity > 1 && item.unit === 'item' ? 's' : ''}
-                          </span>
-                        </div>
-                        <span className="font-bold text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
-                          {item.quantity} {item.unit}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-2">
+                    <span className="text-slate-500 font-medium">Phone for SMS:</span>
+                    <span className="font-bold text-slate-900 text-right">
+                      {customerPhone.trim() || <span className="text-slate-400 font-normal italic">Enter phone number</span>}
+                    </span>
                   </div>
-                )}
+                  <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-2">
+                    <span className="text-slate-500 font-medium">Pickup Location:</span>
+                    <span className="font-bold text-slate-900 text-right max-w-[180px] truncate">
+                      {customerAddress.trim() || <span className="text-slate-400 font-normal italic">Enter address/estate</span>}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                    <span className="text-slate-500 font-medium">Scheduled Pickup:</span>
+                    <span className="font-bold text-blue-700">{pickupDate} ({pickupTimeWindow})</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">Preferred Return:</span>
+                    <span className="font-bold text-slate-800">{deliveryDate} ({deliveryTimeWindow})</span>
+                  </div>
+                </div>
 
                 {/* Pre-Delivery Invoicing Notice Card */}
                 <div className="bg-blue-50/90 rounded-2xl p-4 space-y-3 text-xs border border-blue-200">
                   <div className="flex items-center gap-2 font-black text-blue-950 text-sm">
                     <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>Invoicing & Payment on Delivery</span>
+                    <span>How Payment & Invoicing Works</span>
                   </div>
                   <div className="space-y-2 text-slate-700 text-xs leading-relaxed">
                     <div className="flex items-start gap-2">
                       <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Doorstep Collection & Delivery:</strong> 100% FREE.</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Protective Packaging:</strong> Complimentary fresh covers.</span>
+                      <span><strong>Free Doorstep Collection:</strong> No pickup or bag collection fees.</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                      <span><strong>Pre-Delivery Invoice:</strong> After pickup, we inspect and weigh your items at the facility and text you the itemized invoice before delivery.</span>
+                      <span><strong>Weighed by Admin at Facility:</strong> Laundry is weighed & priced accurately upon arrival.</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                      <span><strong>Itemized SMS Invoice:</strong> An SMS with full price breakdown will be sent directly to your phone.</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                      <span><strong>Pay on Delivery:</strong> Payment is collected upon delivery, NOT on pickup (M-Pesa or Cash).</span>
+                      <span><strong>Pay on Delivery:</strong> Inspect your fresh clothes and pay via M-Pesa or Cash.</span>
                     </div>
                   </div>
+                </div>
+
+                {/* Amount Due at Booking */}
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-900">Due at Booking:</span>
+                  <span className="text-sm font-black text-emerald-700">KSh 0 (Pay on Delivery)</span>
                 </div>
 
                 <button
@@ -780,14 +660,18 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   {submittingOrder ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Booking Your Pickup...
+                      Scheduling Pickup...
                     </>
                   ) : (
                     <>
-                      <Truck className="w-4 h-4" /> Book Pickup (Pay on Delivery)
+                      <Truck className="w-4 h-4" /> Schedule Laundry Pickup
                     </>
                   )}
                 </button>
+
+                <p className="text-[11px] text-center text-slate-400 font-medium">
+                  Uniformed rider • SMS invoice after weighing • Pay on delivery
+                </p>
               </div>
             </div>
           </form>
@@ -795,7 +679,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
       </section>
 
       {/* How It Works Section */}
-      <section className="bg-white border-y border-slate-200 py-12">
+      <section id="how-it-works" className="bg-white border-y border-slate-200 py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-xl mx-auto mb-10">
             <h3 className="text-xl sm:text-2xl font-black text-slate-900">Simple 3-Step Laundry Experience</h3>
@@ -807,9 +691,9 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-xl mx-auto flex items-center justify-center text-xl font-bold">
                 1
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Schedule Online</h4>
+              <h4 className="font-bold text-slate-900 text-sm">Schedule Pickup Online</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Pick your address, items and preferred collection time slot. Takes less than a minute with no account setup.
+                Enter your collection address and convenient time slot. No upfront card or payment required.
               </p>
             </div>
 
@@ -817,9 +701,9 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               <div className="w-12 h-12 bg-indigo-100 text-indigo-700 rounded-xl mx-auto flex items-center justify-center text-xl font-bold">
                 2
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Rider Collects</h4>
+              <h4 className="font-bold text-slate-900 text-sm">Weighed & Invoiced via SMS</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Our uniformed rider arrives at your doorstep with heavy-duty laundry bags and confirms your items.
+                Rider collects your bags. Our facility weighs and inspects your garments, and texts you an itemized SMS invoice.
               </p>
             </div>
 
@@ -827,9 +711,9 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-xl mx-auto flex items-center justify-center text-xl font-bold">
                 3
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Delivered Fresh</h4>
+              <h4 className="font-bold text-slate-900 text-sm">Delivered Fresh & Pay</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Receive your fresh garments neatly folded, hung and protected. Settle payment conveniently via M-Pesa.
+                Receive your fresh garments neatly folded and protected. Settle payment conveniently upon delivery via M-Pesa or Cash.
               </p>
             </div>
           </div>

@@ -207,8 +207,19 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                         order.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-700' :
                         order.paymentStatus === 'Partial' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'
                       }`}>
-                        {order.paymentStatus} {order.balanceDue > 0 && `(Due: KSh ${order.balanceDue.toLocaleString()})`}
+                        {order.paymentStatus} {order.balanceDue > 0 && `(Due on Delivery: KSh ${order.balanceDue.toLocaleString()})`}
                       </span>
+                      <div className="mt-1">
+                        {order.invoiceSent ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
+                            ✓ Invoice Sent
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1 animate-pulse">
+                            ⚠️ Invoice Pending
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">

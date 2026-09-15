@@ -30,10 +30,20 @@ interface CustomerPageProps {
   onPlaceOrder: (orderData: any) => Promise<Order | null>;
   onAddReview: (reviewData: { customerName: string; rating: number; comment: string; serviceUsed?: string }) => Promise<boolean>;
   onGoToLogin: () => void;
+  onGoToDashboard?: () => void;
   isLoggedIn?: boolean;
   currentUserRole?: 'admin' | 'driver';
   onBackToDashboard?: () => void;
 }
+
+const FALLBACK_SERVICES: ServiceItem[] = [
+  { id: "s1", name: "Wash & Fold (Standard Bag)", category: "Wash & Fold", price: 150, unit: "kg" },
+  { id: "s2", name: "Wash & Fold (Heavy/Bedding)", category: "Wash & Fold", price: 250, unit: "kg" },
+  { id: "s3", name: "Executive Suit (Dry Clean)", category: "Dry Cleaning", price: 1200, unit: "item" },
+  { id: "s4", name: "Dress Shirt (Dry Clean & Press)", category: "Ironing", price: 350, unit: "item" },
+  { id: "s5", name: "Curtains & Drapes (Deep Clean)", category: "Special Care", price: 400, unit: "kg" },
+  { id: "s6", name: "Bed Duvet / Comforter", category: "Special Care", price: 1800, unit: "item" }
+];
 
 export const CustomerPage: React.FC<CustomerPageProps> = ({
   services,
@@ -41,10 +51,13 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
   onPlaceOrder,
   onAddReview,
   onGoToLogin,
+  onGoToDashboard,
   isLoggedIn,
   currentUserRole,
   onBackToDashboard
 }) => {
+  const availableServices = (services && services.length > 0) ? services : FALLBACK_SERVICES;
+
   // Order form state
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -59,8 +72,8 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
   const [deliveryDate, setDeliveryDate] = useState(defaultDeliveryDate);
   const [deliveryTimeWindow, setDeliveryTimeWindow] = useState("02:00 PM - 04:00 PM");
 
-  // Selected items: map serviceId -> quantity
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  // Selected items: map serviceId -> quantity (Default to 1 item of first service so order is ready)
+  const [quantities, setQuantities] = useState<Record<string, number>>({ "s1": 1 });
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [orderError, setOrderError] = useState("");
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
@@ -101,37 +114,38 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
   // Quick preset loader
   const handleApplyPreset = (presetName: string) => {
     const updated: Record<string, number> = { ...quantities };
-    if (presetName === "wash_fold_5kg") {
-      const s = services.find(item => item.name.toLowerCase().includes("wash & fold") && !item.name.toLowerCase().includes("heavy")) || services[0];
+    if (presetName === "wash_bag") {
+      const s = availableServices.find(item => item.name.toLowerCase().includes("wash & fold")) || availableServices[0];
+      if (s) updated[s.id] = (updated[s.id] || 0) + 1;
+    } else if (presetName === "wash_fold_5kg") {
+      const s = availableServices.find(item => item.name.toLowerCase().includes("wash & fold") && !item.name.toLowerCase().includes("heavy")) || availableServices[0];
       if (s) updated[s.id] = (updated[s.id] || 0) + 5;
     } else if (presetName === "suits_dryclean") {
-      const s = services.find(item => item.name.toLowerCase().includes("suit")) || services[1];
+      const s = availableServices.find(item => item.name.toLowerCase().includes("suit")) || availableServices[1] || availableServices[0];
       if (s) updated[s.id] = (updated[s.id] || 0) + 2;
     } else if (presetName === "duvet") {
-      const s = services.find(item => item.name.toLowerCase().includes("duvet") || item.name.toLowerCase().includes("comforter")) || services[services.length - 1];
+      const s = availableServices.find(item => item.name.toLowerCase().includes("duvet") || item.name.toLowerCase().includes("comforter")) || availableServices[availableServices.length - 1];
       if (s) updated[s.id] = (updated[s.id] || 0) + 1;
     }
     setQuantities(updated);
   };
 
-  // Calculate subtotal
+  // Calculate items list
   const selectedItemsList = Object.entries(quantities)
     .filter(([_, qty]) => Number(qty) > 0)
     .map(([serviceId, qty]) => {
       const numQty = Number(qty);
-      const service = services.find(s => s.id === serviceId);
-      const unitPrice = service?.price || 0;
+      const service = availableServices.find(s => s.id === serviceId);
+      const unitPrice = service?.price || 150;
       return {
         serviceId,
-        serviceName: service?.name || "Laundry Item",
-        unit: service?.unit || "item",
+        serviceName: service?.name || "General Laundry Care",
+        unit: service?.unit || "bag",
         quantity: numQty,
         unitPrice,
         subtotal: unitPrice * numQty
       };
     });
-
-  const estimatedTotal = selectedItemsList.reduce((sum, item) => sum + item.subtotal, 0);
 
   // Handle Order Submit
   const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -139,13 +153,22 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
     setOrderError("");
 
     if (!customerName.trim() || !customerPhone.trim() || !customerAddress.trim()) {
-      setOrderError("Please provide your name, phone number, and pickup address.");
+      setOrderError("Please enter your name, phone number, and pickup address.");
       return;
     }
 
-    if (selectedItemsList.length === 0) {
-      setOrderError("Please select at least one laundry service or item below.");
-      return;
+    // Resilient fallback if user unchecked all items: default to 1 laundry bag
+    let itemsToSubmit = selectedItemsList;
+    if (itemsToSubmit.length === 0) {
+      const defaultS = availableServices[0] || FALLBACK_SERVICES[0];
+      itemsToSubmit = [{
+        serviceId: defaultS.id,
+        serviceName: defaultS.name,
+        unit: defaultS.unit,
+        quantity: 1,
+        unitPrice: defaultS.price,
+        subtotal: defaultS.price
+      }];
     }
 
     setSubmittingOrder(true);
@@ -159,16 +182,17 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
         deliveryDate,
         deliveryTimeWindow,
         notes: notes.trim(),
-        items: selectedItemsList
+        items: itemsToSubmit
       };
 
       const created = await onPlaceOrder(orderPayload);
       if (created) {
         setConfirmedOrder(created);
-        setReviewName(customerName); // Pre-fill review form with their name
-        // Reset form selections
-        setQuantities({});
+        setReviewName(customerName);
+        setQuantities({ "s1": 1 });
         setNotes("");
+        // Scroll to top of confirmation
+        window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         setOrderError("Failed to book pickup. Please check your connection and try again.");
       }
@@ -228,6 +252,23 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-blue-100 selection:text-blue-900">
+      {/* Operations Quick Access Bar */}
+      <div className="bg-slate-900 text-slate-300 text-[11px] py-1.5 px-4 border-b border-slate-800">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Sparkle Spins • Doorstep Laundry & Garment Care in Nairobi Environs</span>
+          </div>
+          <button
+            type="button"
+            onClick={onGoToDashboard || onGoToLogin}
+            className="text-blue-300 hover:text-white font-bold transition-colors cursor-pointer flex items-center gap-1 text-[11px]"
+          >
+            Operations & Staff Dashboard &rarr;
+          </button>
+        </div>
+      </div>
+
       {/* Top Banner Navigation */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between">
@@ -246,40 +287,49 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <a
               href="#book-order"
-              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-3 py-1.5"
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors px-2.5 py-1.5"
             >
               Book Pickup
             </a>
             <a
               href="#services"
-              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-3 py-1.5"
+              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2.5 py-1.5"
             >
-              Services Offered
+              Services
             </a>
             <a
               href="#reviews"
-              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-3 py-1.5"
+              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2.5 py-1.5"
             >
               Testimonials
             </a>
+
+            <button
+              type="button"
+              onClick={onGoToDashboard || onGoToLogin}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Operations</span> Dashboard
+            </button>
 
             {isLoggedIn ? (
               <button
                 type="button"
                 onClick={onBackToDashboard}
-                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
               >
                 <ArrowRight className="w-3.5 h-3.5" />
-                Staff Dashboard ({currentUserRole})
+                Staff ({currentUserRole})
               </button>
             ) : (
               <button
                 type="button"
                 onClick={onGoToLogin}
-                className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                className="hidden md:inline-flex bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer items-center gap-1"
               >
                 <LogIn className="w-3.5 h-3.5 text-slate-500" />
                 Staff Login
@@ -289,129 +339,38 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-b from-blue-50/70 via-sky-50/30 to-slate-50 border-b border-blue-100/60 py-12 sm:py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid md:grid-cols-12 gap-8 items-center">
-            <div className="md:col-span-7 space-y-4">
-              <div className="inline-flex items-center gap-2 bg-blue-100/80 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full border border-blue-200">
-                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                No account or password needed • Book in 60 seconds
-              </div>
-
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                Doorstep Laundry, Dry Cleaning & Ironing
-              </h1>
-
-              <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-xl">
-                Schedule a pickup from your apartment or office. Our riders collect your items, our specialists clean & press them, and we deliver them back fresh.
-              </p>
-
-              {/* Badges */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-                <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                    <Truck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">Free Collection</p>
-                    <p className="text-[11px] text-slate-500">Fast Doorstep Pickup</p>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">24h - 48h Delivery</p>
-                    <p className="text-[11px] text-slate-500">On-Time Guarantee</p>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 col-span-2 sm:col-span-1">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                    <HeartHandshake className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">Pay on Delivery</p>
-                    <p className="text-[11px] text-slate-500">M-Pesa or Cash</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Summary Card / Trust Metrics */}
-            <div className="md:col-span-5">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-md shadow-slate-200/50 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Customer Satisfaction</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-3xl font-black text-slate-900">{averageRating}</span>
-                      <div className="flex text-amber-400">
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <Star key={star} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                    {reviews.length} Verified Reviews
-                  </span>
-                </div>
-
-                <div className="space-y-2.5 text-xs text-slate-600">
-                  <div className="flex items-center justify-between py-1 border-b border-slate-50">
-                    <span className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-blue-600" /> Gentle Eco Detergent Used
-                    </span>
-                    <span className="font-semibold text-slate-800">Included</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-50">
-                    <span className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-blue-600" /> Professional Steam Ironing
-                    </span>
-                    <span className="font-semibold text-slate-800">Available</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1 border-b border-slate-50">
-                    <span className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-blue-600" /> SMS Rider Arrival Updates
-                    </span>
-                    <span className="font-semibold text-slate-800">Included</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1">
-                    <span className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-blue-600" /> Protective Garment Covers
-                    </span>
-                    <span className="font-semibold text-slate-800">Free</span>
-                  </div>
-                </div>
-
-                <a
-                  href="#book-order"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
-                >
-                  Schedule Your Pickup Below <ArrowRight className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
+      {/* 1. Schedule a Laundry Pickup (COMES FIRST) */}
+      <section id="book-order" className="py-8 sm:py-10 max-w-6xl mx-auto px-4 sm:px-6 w-full">
+        {/* Banner with Value Propositions & Trust Metrics */}
+        <div className="mb-8 text-center max-w-3xl mx-auto space-y-3">
+          <div className="inline-flex items-center gap-2 bg-blue-100/80 text-blue-800 text-xs font-semibold px-3.5 py-1 rounded-full border border-blue-200">
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            Doorstep Laundry & Garment Care • Book in under 60 seconds
           </div>
-        </div>
-      </section>
 
-      {/* Main Order Placement Section */}
-      <section id="book-order" className="py-12 max-w-6xl mx-auto px-4 sm:px-6 w-full">
-        <div className="mb-8 text-center max-w-2xl mx-auto">
-          <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
-            Quick Booking Form
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
             Schedule a Laundry Pickup
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">
-            Fill in your collection address, choose your laundry items, and pick a convenient time. No pre-payment required.
+          </h1>
+
+          <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
+            Choose your collection address, laundry items, and convenient pickup window. Pay on delivery (M-Pesa or Cash).
           </p>
+
+          {/* Key Trust Highlights */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 pt-2 text-xs font-bold text-slate-700">
+            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
+              <Truck className="w-4 h-4 text-emerald-600" /> Free Doorstep Collection
+            </span>
+            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
+              <Clock className="w-4 h-4 text-blue-600" /> 24h - 48h Turnaround
+            </span>
+            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
+              <HeartHandshake className="w-4 h-4 text-indigo-600" /> Pay on Delivery
+            </span>
+            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs">
+              <ShieldCheck className="w-4 h-4 text-amber-500" /> 4.9★ Customer Rating
+            </span>
+          </div>
         </div>
 
         {/* Order Confirmation Screen if created */}
@@ -656,26 +615,33 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   </div>
 
                   {/* Quick Preset Buttons */}
-                  <div className="hidden sm:flex items-center gap-1.5">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">Quick Add:</span>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase mr-1">Quick Select:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyPreset("wash_bag")}
+                      className="text-[11px] font-medium bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 cursor-pointer"
+                    >
+                      +1 Laundry Bag
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleApplyPreset("wash_fold_5kg")}
-                      className="text-[11px] font-medium bg-blue-50 text-blue-700 px-2 py-1 rounded-md border border-blue-200 hover:bg-blue-100 cursor-pointer"
+                      className="text-[11px] font-medium bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 cursor-pointer"
                     >
                       +5kg Wash
                     </button>
                     <button
                       type="button"
                       onClick={() => handleApplyPreset("suits_dryclean")}
-                      className="text-[11px] font-medium bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md border border-indigo-200 hover:bg-indigo-100 cursor-pointer"
+                      className="text-[11px] font-medium bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-200 hover:bg-indigo-100 cursor-pointer"
                     >
                       +2 Suits
                     </button>
                     <button
                       type="button"
                       onClick={() => handleApplyPreset("duvet")}
-                      className="text-[11px] font-medium bg-purple-50 text-purple-700 px-2 py-1 rounded-md border border-purple-200 hover:bg-purple-100 cursor-pointer"
+                      className="text-[11px] font-medium bg-purple-50 text-purple-700 px-2.5 py-1 rounded-md border border-purple-200 hover:bg-purple-100 cursor-pointer"
                     >
                       +1 Duvet
                     </button>
@@ -683,7 +649,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {services.map(service => {
+                  {availableServices.map(service => {
                     const count = quantities[service.id] || 0;
                     return (
                       <div
@@ -808,7 +774,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
 
                 <button
                   type="submit"
-                  disabled={submittingOrder || selectedItemsList.length === 0}
+                  disabled={submittingOrder}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 px-4 rounded-xl text-sm transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 >
                   {submittingOrder ? (
@@ -1128,13 +1094,22 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 Go to Dashboard
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={onGoToLogin}
-                className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer"
-              >
-                Staff Portal Sign In
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onGoToDashboard || onGoToLogin}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Truck className="w-3.5 h-3.5" /> Operations Dashboard
+                </button>
+                <button
+                  type="button"
+                  onClick={onGoToLogin}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </div>
             )}
           </div>
         </div>

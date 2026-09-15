@@ -258,14 +258,58 @@ export default function App() {
     }
   };
 
+  const handleUpdateOrderDetails = async (orderId: string, updatedData: any) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedData)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setOrders(prev => prev.map(o => o.id === orderId ? updated : o));
+        setSelectedOrderForDetail(prev => prev && prev.id === orderId ? updated : prev);
+        fetchData();
+        return updated;
+      }
+      throw new Error("Failed to update order");
+    } catch (e) {
+      console.error("Failed to update order details", e);
+      throw e;
+    }
+  };
+
+  const handleSendInvoice = async (orderId: string, customMessage?: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/send-invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customMessage })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.order) {
+          setOrders(prev => prev.map(o => o.id === orderId ? data.order : o));
+          setSelectedOrderForDetail(prev => prev && prev.id === orderId ? data.order : prev);
+        }
+        fetchData();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error("Failed to send pre-delivery invoice", e);
+      return false;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-xl font-bold animate-pulse">
-            🧺
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl font-bold animate-pulse">
+            ✨
           </div>
-          <p className="text-sm font-medium text-slate-600">Loading LaundryOps Manager...</p>
+          <p className="text-sm font-medium text-slate-600">Loading Sparkle Spins...</p>
         </div>
       </div>
     );
@@ -300,6 +344,7 @@ export default function App() {
         onPlaceOrder={handleCustomerPlaceOrder}
         onAddReview={handleAddReview}
         onGoToLogin={() => setPublicScreen('login')}
+        onGoToDashboard={() => setPublicScreen('login')}
         isLoggedIn={false}
       />
     );
@@ -314,6 +359,7 @@ export default function App() {
         onPlaceOrder={handleCustomerPlaceOrder}
         onAddReview={handleAddReview}
         onGoToLogin={() => {}}
+        onGoToDashboard={() => setViewingCustomerPage(false)}
         isLoggedIn={true}
         currentUserRole={currentUser.role}
         onBackToDashboard={() => setViewingCustomerPage(false)}
@@ -328,12 +374,12 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-lg font-bold shadow-lg shadow-blue-200">
-              🧺
+              ✨
             </div>
             <div>
-              <span className="font-bold text-slate-900 text-xl tracking-tight">LaundryOps<span className="text-blue-600">Pro</span></span>
+              <span className="font-bold text-slate-900 text-xl tracking-tight">Sparkle <span className="text-blue-600">Spins</span></span>
               <span className="text-xs text-blue-600 font-semibold ml-2 bg-blue-50 px-2.5 py-0.5 rounded-full hidden sm:inline-block">
-                Pickup & Delivery
+                Doorstep Laundry Care
               </span>
             </div>
           </div>
@@ -573,8 +619,11 @@ export default function App() {
         <OrderDetailModal
           order={selectedOrderForDetail}
           drivers={drivers}
+          services={services}
           onClose={() => setSelectedOrderForDetail(null)}
           onUpdateStatus={handleUpdateStatus}
+          onUpdateOrderDetails={handleUpdateOrderDetails}
+          onSendInvoice={handleSendInvoice}
           onOpenPaymentModal={(ord) => setSelectedOrderForPayment(ord)}
           onOpenInvoice={(ord) => setSelectedOrderForInvoice(ord)}
         />

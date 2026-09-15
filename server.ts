@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import { initializeApp, getApps, App } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 
@@ -136,6 +135,8 @@ interface Order {
   balanceDue: number;
   notes?: string;
   proofOfDelivery?: string;
+  invoiceSent?: boolean;
+  invoiceSentAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -608,25 +609,43 @@ app.post("/api/orders", async (req, res) => {
     }
 
     if (!customer) {
-      return res.status(400).json({ error: "Customer information is required (name, phone, address)" });
-    }
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "Order must contain at least one service item" });
+      const fallbackName = customerName ? String(customerName).trim() : "Guest Customer";
+      const fallbackPhone = customerPhone ? String(customerPhone).trim() : "Pending";
+      customer = {
+        id: "c_" + Date.now(),
+        name: fallbackName,
+        phone: fallbackPhone,
+        address: customerAddress ? String(customerAddress).trim() : "Pickup address pending",
+        notes: notes ? `Booking: ${String(notes).trim()}` : "Booked via customer portal",
+        createdAt: new Date().toISOString()
+      };
+      inMemoryCustomers.unshift(customer);
+      saveToFirestore("customers", customer.id, customer);
     }
 
     const services = await getCollection<ServiceItem>("services", inMemoryServices);
+    let itemsToProcess = Array.isArray(items) && items.length > 0 ? items : [
+      {
+        serviceId: services[0]?.id || "s1",
+        serviceName: services[0]?.name || "Wash & Fold (Standard)",
+        unit: services[0]?.unit || "kg",
+        quantity: 5,
+        unitPrice: services[0]?.price || 150
+      }
+    ];
+
     let subtotal = 0;
-    const processedItems: OrderItem[] = items.map((item: any) => {
+    const processedItems: OrderItem[] = itemsToProcess.map((item: any) => {
       const sItem = services.find(s => s.id === item.serviceId);
       const unitPrice = sItem ? sItem.price : (Number(item.unitPrice) || 0);
-      const itemSubtotal = unitPrice * Number(item.quantity);
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      const itemSubtotal = unitPrice * qty;
       subtotal += itemSubtotal;
       return {
-        serviceId: item.serviceId,
-        serviceName: sItem ? sItem.name : item.serviceName,
+        serviceId: item.serviceId || (sItem ? sItem.id : "s1"),
+        serviceName: sItem ? sItem.name : (item.serviceName || "Laundry Item"),
         unit: sItem ? sItem.unit : (item.unit || 'item'),
-        quantity: Number(item.quantity),
+        quantity: qty,
         unitPrice,
         subtotal: itemSubtotal
       };
@@ -961,6 +980,7 @@ app.post("/api/reviews", async (req, res) => {
 async function startServer() {
   try {
     if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",

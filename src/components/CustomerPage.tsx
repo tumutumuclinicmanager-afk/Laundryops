@@ -184,18 +184,23 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
     : "4.9";
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen bg-gradient-to-tr from-slate-50 via-indigo-50/20 to-purple-50/30 text-slate-900 flex flex-col selection:bg-indigo-100 selection:text-indigo-900 relative overflow-hidden">
+      {/* Dynamic Background Blur Accents */}
+      <div className="absolute top-0 left-1/4 w-[450px] h-[450px] bg-purple-200/30 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse duration-10000"></div>
+      <div className="absolute top-1/4 right-1/4 w-[550px] h-[550px] bg-blue-200/25 rounded-full blur-[140px] pointer-events-none -z-10"></div>
+      <div className="absolute bottom-1/4 left-1/3 w-[350px] h-[350px] bg-indigo-200/25 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+
       {/* Operations Quick Access Bar */}
-      <div className="bg-slate-900 text-slate-300 text-[11px] py-1 px-4 border-b border-slate-800">
+      <div className="bg-gradient-to-r from-purple-900 via-indigo-950 to-blue-950 text-slate-200 text-[11px] py-1.5 px-4 border-b border-purple-800/40 shadow-xs">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 truncate">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="truncate">Sparkle Spins • Doorstep Laundry & Garment Care</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="truncate font-medium">Sparkle Spins • Premium Doorstep Laundry & Professional Garment Care</span>
           </div>
           <button
             type="button"
             onClick={onGoToDashboard || onGoToLogin}
-            className="text-blue-300 hover:text-white font-bold transition-colors cursor-pointer flex items-center gap-1 text-[11px] shrink-0 ml-2"
+            className="text-purple-300 hover:text-white font-bold transition-colors cursor-pointer flex items-center gap-1 text-[11px] shrink-0 ml-2"
           >
             Operations & Staff Dashboard &rarr;
           </button>
@@ -203,16 +208,16 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
       </div>
 
       {/* Top Banner Navigation */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-indigo-100/60 shadow-xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-base shadow-xs shadow-blue-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-blue-600 text-white flex items-center justify-center text-lg shadow-md shadow-indigo-500/20">
               ✨
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-slate-900 text-base tracking-tight leading-none">Sparkle Spins</span>
-                <span className="text-[10px] font-bold uppercase bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full border border-blue-200">
+                <span className="font-extrabold text-slate-950 text-base tracking-tight leading-none">Sparkle Spins</span>
+                <span className="text-[10px] font-extrabold uppercase bg-purple-50 text-purple-700 px-2.5 py-0.5 rounded-full border border-purple-200">
                   Client Portal
                 </span>
               </div>
@@ -223,19 +228,25 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
           <div className="flex items-center gap-2 sm:gap-2.5">
             <a
               href="#book-order"
-              className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors px-2 py-1"
+              className="text-xs font-bold text-purple-600 hover:text-purple-700 transition-colors px-2 py-1"
             >
               Book Pickup
             </a>
             <a
+              href="#services-menu"
+              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-purple-600 transition-colors px-2 py-1"
+            >
+              Services Guide
+            </a>
+            <a
               href="#how-it-works"
-              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2 py-1"
+              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-purple-600 transition-colors px-2 py-1"
             >
               How It Works
             </a>
             <a
               href="#reviews"
-              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2 py-1"
+              className="hidden sm:inline-flex text-xs font-semibold text-slate-600 hover:text-purple-600 transition-colors px-2 py-1"
             >
               Testimonials
             </a>
@@ -243,7 +254,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
             <button
               type="button"
               onClick={onGoToDashboard || onGoToLogin}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer hover:shadow-md hover:scale-[1.02]"
             >
               <Truck className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Operations</span> Dashboard
@@ -253,7 +264,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               <button
                 type="button"
                 onClick={onBackToDashboard}
-                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
               >
                 <ArrowRight className="w-3.5 h-3.5" />
                 Staff ({currentUserRole})
@@ -262,7 +273,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               <button
                 type="button"
                 onClick={onGoToLogin}
-                className="hidden md:inline-flex bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer items-center gap-1"
+                className="hidden md:inline-flex bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer items-center gap-1"
               >
                 <LogIn className="w-3.5 h-3.5 text-slate-500" />
                 Staff Login
@@ -273,37 +284,37 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
       </header>
 
       {/* 1. Schedule a Laundry Pickup (COMES FIRST) */}
-      <section id="book-order" className="pt-2 sm:pt-3 pb-8 max-w-6xl mx-auto px-4 sm:px-6 w-full">
+      <section id="book-order" className="pt-4 sm:pt-6 pb-12 max-w-6xl mx-auto px-4 sm:px-6 w-full relative z-10">
         {/* Compact Hero Header - puts form front and center */}
-        <div className="mb-3.5 sm:mb-4 text-center max-w-3xl mx-auto space-y-1">
-          <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-blue-200/80">
-            <Sparkles className="w-3 h-3 text-blue-600" />
+        <div className="mb-6 sm:mb-8 text-center max-w-3xl mx-auto space-y-2">
+          <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-purple-50 to-blue-50 text-indigo-700 text-[11px] font-bold px-3 py-1 rounded-full border border-indigo-200/80 shadow-2xs">
+            <Sparkles className="w-3 h-3 text-purple-600 animate-spin" />
             Doorstep Laundry & Garment Care • Book in under 60 seconds
           </div>
 
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight bg-gradient-to-r from-purple-900 via-indigo-950 to-blue-900 bg-clip-text text-transparent">
             Schedule a Laundry Pickup
           </h1>
 
-          <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto">
-            Choose your collection address, laundry items, and convenient pickup window. Pay on delivery (M-Pesa or Cash).
+          <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto leading-relaxed">
+            Choose your collection address, laundry items, and convenient pickup window. Settle balance on delivery (M-Pesa or Cash).
           </p>
 
           {/* Inline Trust Highlights - sleek single row */}
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-0.5 text-[11px] font-semibold text-slate-600">
-            <span className="inline-flex items-center gap-1 text-slate-700">
-              <Truck className="w-3.5 h-3.5 text-emerald-600" /> Free Collection
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 pt-1 text-[11px] font-bold text-slate-700">
+            <span className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg shadow-2xs border border-slate-100">
+              <Truck className="w-3.5 h-3.5 text-blue-600" /> Free Collection
             </span>
             <span className="text-slate-300 hidden sm:inline">•</span>
-            <span className="inline-flex items-center gap-1 text-slate-700">
-              <Clock className="w-3.5 h-3.5 text-blue-600" /> 24h - 48h Turnaround
+            <span className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg shadow-2xs border border-slate-100">
+              <Clock className="w-3.5 h-3.5 text-purple-600" /> 24h - 48h Turnaround
             </span>
             <span className="text-slate-300 hidden sm:inline">•</span>
-            <span className="inline-flex items-center gap-1 text-slate-700">
+            <span className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg shadow-2xs border border-slate-100">
               <HeartHandshake className="w-3.5 h-3.5 text-indigo-600" /> Pay on Delivery
             </span>
             <span className="text-slate-300 hidden sm:inline">•</span>
-            <span className="inline-flex items-center gap-1 text-slate-700">
+            <span className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg shadow-2xs border border-slate-100">
               <ShieldCheck className="w-3.5 h-3.5 text-amber-500" /> 4.9★ Customer Rating
             </span>
           </div>
@@ -311,7 +322,8 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
 
         {/* Order Confirmation Screen if created */}
         {confirmedOrder ? (
-          <div className="max-w-2xl mx-auto bg-white rounded-3xl border-2 border-emerald-200 p-6 sm:p-8 shadow-xl space-y-6">
+          <div className="max-w-2xl mx-auto bg-white rounded-3xl border-2 border-emerald-200 p-6 sm:p-8 shadow-xl space-y-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl"></div>
             <div className="text-center space-y-2">
               <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl mx-auto flex items-center justify-center">
                 <CheckCircle2 className="w-10 h-10" />
@@ -353,17 +365,17 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-900 space-y-1.5">
-              <p className="font-extrabold flex items-center gap-1.5 text-blue-950">
-                <Sparkles className="w-4 h-4 text-blue-600" /> What happens next?
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-xs text-indigo-900 space-y-1.5">
+              <p className="font-extrabold flex items-center gap-1.5 text-indigo-950">
+                <Sparkles className="w-4 h-4 text-purple-600" /> What happens next?
               </p>
-              <p className="text-blue-800 leading-relaxed">
+              <p className="text-indigo-800 leading-relaxed">
                 1. Our rider will arrive during your scheduled window to collect your garments. No payment is required at pickup.
               </p>
-              <p className="text-blue-800 leading-relaxed">
+              <p className="text-indigo-800 leading-relaxed">
                 2. Our facility team will weigh and inspect your garments, then send you an official itemized invoice via SMS/WhatsApp before delivery.
               </p>
-              <p className="text-blue-800 leading-relaxed">
+              <p className="text-indigo-800 leading-relaxed">
                 3. You inspect your fresh garments upon delivery and pay via M-Pesa or Cash.
               </p>
             </div>
@@ -372,7 +384,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               <button
                 type="button"
                 onClick={() => setConfirmedOrder(null)}
-                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs sm:text-sm transition-all cursor-pointer text-center"
+                className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 rounded-xl text-xs sm:text-sm transition-all cursor-pointer text-center"
               >
                 Place Another Order
               </button>
@@ -385,22 +397,22 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmitOrder} className="grid lg:grid-cols-12 gap-5">
+          <form onSubmit={handleSubmitOrder} className="grid lg:grid-cols-12 gap-6 relative z-10">
             {/* Left Column: Customer Details & Schedule */}
-            <div className="lg:col-span-7 space-y-4">
+            <div className="lg:col-span-7 space-y-5">
               {/* Step 1: Contact Details */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
-                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5">
-                  <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+              <div className="bg-white rounded-2xl border border-indigo-50 p-5 shadow-xs space-y-4 hover:border-purple-200/60 transition-all">
+                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                     1
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-sm">Your Contact & Pickup Address</h3>
+                    <h3 className="font-extrabold text-slate-900 text-sm">Your Contact & Pickup Address</h3>
                     <p className="text-[11px] text-slate-500">We'll use this to coordinate rider collection</p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Full Name <span className="text-rose-500">*</span>
@@ -413,12 +425,12 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
                         placeholder="e.g. Wanjiku Mwangi"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                        className="w-full bg-slate-50 border border-indigo-50 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
                       />
                     </div>
                   </div>
 
-                  <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="grid sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
                         Phone Number (M-Pesa / Calls) <span className="text-rose-500">*</span>
@@ -431,7 +443,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                           value={customerPhone}
                           onChange={(e) => setCustomerPhone(e.target.value)}
                           placeholder="e.g. +254 712 345678"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                          className="w-full bg-slate-50 border border-indigo-50 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
                         />
                       </div>
                     </div>
@@ -448,7 +460,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                           value={customerAddress}
                           onChange={(e) => setCustomerAddress(e.target.value)}
                           placeholder="e.g. Kilimani, Rose Ave, Apt 4B"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                          className="w-full bg-slate-50 border border-indigo-50 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
                         />
                       </div>
                     </div>
@@ -463,44 +475,44 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="e.g. Gate code #3321, please call before entering, delicate fabrics"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white resize-none"
+                      className="w-full bg-slate-50 border border-indigo-50 rounded-xl p-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white resize-none transition-all"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Step 2: Scheduling Time Slots */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
-                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5">
-                  <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+              <div className="bg-white rounded-2xl border border-indigo-50 p-5 shadow-xs space-y-4 hover:border-blue-200/60 transition-all">
+                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                     2
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-sm">Schedule Pickup & Return Date</h3>
+                    <h3 className="font-extrabold text-slate-900 text-sm">Schedule Pickup & Return Date</h3>
                     <p className="text-[11px] text-slate-500">Pick the time window convenient for you</p>
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-3.5">
+                <div className="grid sm:grid-cols-2 gap-4">
                   {/* Pickup */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-blue-600" /> Pickup Date
+                  <div className="space-y-1.5 bg-purple-50/20 p-3.5 rounded-xl border border-purple-100/50">
+                    <label className="block text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-purple-600" /> Pickup Date
                     </label>
                     <input
                       type="date"
                       value={pickupDate}
                       min={todayStr}
                       onChange={(e) => setPickupDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
-                    <label className="block text-[11px] font-semibold text-slate-500 mt-1">
+                    <label className="block text-[11px] font-bold text-slate-500 mt-1.5">
                       Pickup Window
                     </label>
                     <select
                       value={pickupTimeWindow}
                       onChange={(e) => setPickupTimeWindow(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
                     >
                       {timeSlots.map(slot => (
                         <option key={`pick-${slot}`} value={slot}>{slot}</option>
@@ -509,24 +521,24 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   </div>
 
                   {/* Delivery */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Preferred Delivery Date
+                  <div className="space-y-1.5 bg-blue-50/20 p-3.5 rounded-xl border border-blue-100/50">
+                    <label className="block text-xs font-extrabold text-blue-950 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-blue-600" /> Preferred Delivery Date
                     </label>
                     <input
                       type="date"
                       value={deliveryDate}
                       min={pickupDate}
                       onChange={(e) => setDeliveryDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <label className="block text-[11px] font-semibold text-slate-500 mt-1">
+                    <label className="block text-[11px] font-bold text-slate-500 mt-1.5">
                       Delivery Window
                     </label>
                     <select
                       value={deliveryTimeWindow}
                       onChange={(e) => setDeliveryTimeWindow(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       {timeSlots.map(slot => (
                         <option key={`del-${slot}`} value={slot}>{slot}</option>
@@ -537,14 +549,14 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               </div>
 
               {/* Pricing & Weighing Transparency Card */}
-              <div className="bg-gradient-to-br from-blue-50/70 to-indigo-50/40 rounded-2xl border border-blue-200/80 p-4 space-y-2.5 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              <div className="bg-gradient-to-br from-purple-50/70 via-indigo-50/40 to-blue-50/70 rounded-2xl border border-indigo-100 p-5 space-y-3.5 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-md">
                     ⚖️
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-xs sm:text-sm">Post-Pickup Weighing & Transparent Pricing</h3>
-                    <p className="text-[10px] sm:text-[11px] text-slate-600">No guesswork required when booking online</p>
+                    <h3 className="font-extrabold text-slate-900 text-xs sm:text-sm">Post-Pickup Weighing & Transparent Pricing</h3>
+                    <p className="text-[10px] sm:text-[11px] text-indigo-700 font-semibold">No guesswork required when booking online</p>
                   </div>
                 </div>
 
@@ -552,19 +564,19 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   Prices are not charged upfront. Our rider collects your laundry bags from your doorstep. At our facility, specialists sort, inspect, and weigh your items on precision scales. You will receive an official itemized <strong>SMS invoice</strong> with the exact verified total before delivery.
                 </p>
 
-                <div className="grid grid-cols-3 gap-2 pt-0.5">
-                  <div className="bg-white/80 border border-blue-100 p-2 rounded-xl text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 block">Step 1</span>
-                    <strong className="text-[11px] text-slate-800 block">Free Pickup</strong>
+                <div className="grid grid-cols-3 gap-2.5 pt-1">
+                  <div className="bg-white/90 border border-purple-100 p-2.5 rounded-xl text-center shadow-2xs">
+                    <span className="text-[9px] uppercase font-bold text-purple-400 block">Step 1</span>
+                    <strong className="text-[11px] text-slate-800 block">Free Collection</strong>
                     <span className="text-[9px] text-slate-500">At your door</span>
                   </div>
-                  <div className="bg-white/80 border border-blue-100 p-2 rounded-xl text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 block">Step 2</span>
+                  <div className="bg-white/90 border border-indigo-100 p-2.5 rounded-xl text-center shadow-2xs">
+                    <span className="text-[9px] uppercase font-bold text-indigo-400 block">Step 2</span>
                     <strong className="text-[11px] text-slate-800 block">Facility Weigh</strong>
                     <span className="text-[9px] text-slate-500">Precision scales</span>
                   </div>
-                  <div className="bg-white/80 border border-blue-100 p-2 rounded-xl text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 block">Step 3</span>
+                  <div className="bg-white/90 border border-blue-100 p-2.5 rounded-xl text-center shadow-2xs">
+                    <span className="text-[9px] uppercase font-bold text-blue-400 block">Step 3</span>
                     <strong className="text-[11px] text-slate-800 block">SMS Invoice</strong>
                     <span className="text-[9px] text-slate-500">Pay on delivery</span>
                   </div>
@@ -574,13 +586,13 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
 
             {/* Right Column: Pickup Request Summary & Placement Button */}
             <div className="lg:col-span-5">
-              <div className="sticky top-16 bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-md shadow-slate-200/50 space-y-3.5">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-blue-600" />
-                    Pickup Request Summary
+              <div className="sticky top-20 bg-white rounded-3xl border border-indigo-100 p-5 shadow-lg shadow-indigo-100/50 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-purple-600" />
+                    Pickup Summary
                   </h3>
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
                     Free Collection
                   </span>
                 </div>
@@ -593,7 +605,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 )}
 
                 {/* Booking Key Info */}
-                <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-xs">
+                <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs">
                   <div className="flex justify-between items-start gap-2 border-b border-slate-200/60 pb-1.5">
                     <span className="text-slate-500 font-medium">Customer:</span>
                     <span className="font-bold text-slate-900 text-right">
@@ -614,7 +626,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   </div>
                   <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5">
                     <span className="text-slate-500 font-medium">Scheduled Pickup:</span>
-                    <span className="font-bold text-blue-700">{pickupDate} ({pickupTimeWindow})</span>
+                    <span className="font-bold text-purple-700">{pickupDate} ({pickupTimeWindow})</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500 font-medium">Preferred Return:</span>
@@ -623,41 +635,41 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 </div>
 
                 {/* Pre-Delivery Invoicing Notice Card */}
-                <div className="bg-blue-50/90 rounded-xl p-3 space-y-1.5 text-xs border border-blue-200">
-                  <div className="flex items-center gap-1.5 font-bold text-blue-950 text-xs sm:text-sm">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <div className="bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-xl p-3.5 space-y-2 text-xs border border-indigo-100">
+                  <div className="flex items-center gap-1.5 font-extrabold text-indigo-950 text-xs sm:text-sm">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                     <span>How Payment & Invoicing Works</span>
                   </div>
-                  <div className="space-y-1 text-slate-700 text-[11px] leading-relaxed">
+                  <div className="space-y-1.5 text-slate-700 text-[11px] leading-relaxed">
                     <div className="flex items-start gap-1.5">
                       <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                       <span><strong>Free Collection:</strong> No pickup or collection bag charges.</span>
                     </div>
                     <div className="flex items-start gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                      <Check className="w-3.5 h-3.5 text-purple-600 shrink-0 mt-0.5" />
                       <span><strong>Accurate Weighing:</strong> Checked & weighed on calibrated facility scales.</span>
                     </div>
                     <div className="flex items-start gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                      <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
                       <span><strong>Itemized SMS Invoice:</strong> Exact breakdown texted before return.</span>
                     </div>
                     <div className="flex items-start gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
                       <span><strong>Pay on Delivery:</strong> Inspect garments & pay via M-Pesa or Cash.</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Amount Due at Booking */}
-                <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between">
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between shadow-3xs">
                   <span className="text-xs font-bold text-emerald-900">Due at Booking:</span>
-                  <span className="text-xs sm:text-sm font-black text-emerald-700">KSh 0 (Pay on Delivery)</span>
+                  <span className="text-xs sm:text-sm font-extrabold text-emerald-700">KSh 0 (Pay on Delivery)</span>
                 </div>
 
                 <button
                   type="submit"
                   disabled={submittingOrder}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 sm:py-3 px-4 rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 hover:shadow-lg hover:scale-[1.01]"
                 >
                   {submittingOrder ? (
                     <>
@@ -680,40 +692,84 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
         )}
       </section>
 
-      {/* How It Works Section */}
-      <section id="how-it-works" className="bg-white border-y border-slate-200 py-12">
+      {/* Dynamic Services Guide Section (NEW APPEALING INTERACTIVE SERVICES MENU) */}
+      <section id="services-menu" className="py-12 bg-white relative z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-xl mx-auto mb-10">
-            <h3 className="text-xl sm:text-2xl font-black text-slate-900">Simple 3-Step Laundry Experience</h3>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">From dirty clothes to crisp delivery in just 24-48 hours</p>
+          <div className="text-center max-w-xl mx-auto mb-8 space-y-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
+              Our Services Menu
+            </span>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Professional Laundry Services</h3>
+            <p className="text-xs sm:text-sm text-slate-500">Every order is weighed, counted, and priced after pickup by our team at the facility</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-center">
-              <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-xl mx-auto flex items-center justify-center text-xl font-bold">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {availableServices.map((service) => (
+              <div
+                key={service.id}
+                className="p-5 rounded-2xl bg-gradient-to-b from-slate-50 to-white border border-indigo-50/80 shadow-3xs flex flex-col justify-between hover:border-purple-200 hover:shadow-md transition-all group"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full">
+                      {service.category}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-400 group-hover:text-purple-600 transition-colors">Verified Standard</span>
+                  </div>
+                  <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-indigo-900 transition-colors">{service.name}</h4>
+                  <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Includes precision sorting, high-efficiency washer cycles, delicate fabric softeners, and hand folded finish.</p>
+                </div>
+                <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-400">Billing Basis:</span>
+                  <div className="text-right">
+                    <span className="text-xs font-extrabold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
+                      Weighed / Counted per {service.unit}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="bg-gradient-to-br from-white via-indigo-50/10 to-purple-50/25 border-y border-indigo-100/40 py-16 relative z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-xl mx-auto mb-12">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+              Process Overview
+            </span>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">Simple 3-Step Laundry Experience</h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1.5">From dirty clothes to crisp delivery in just 24-48 hours</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="p-6 rounded-2xl bg-white border border-indigo-50 shadow-xs hover:shadow-md hover:border-purple-200 transition-all space-y-3 text-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl mx-auto flex items-center justify-center text-lg font-black shadow-md shadow-purple-500/20">
                 1
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Schedule Pickup Online</h4>
+              <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">Schedule Pickup Online</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Enter your collection address and convenient time slot. No upfront card or payment required.
               </p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-center">
-              <div className="w-12 h-12 bg-indigo-100 text-indigo-700 rounded-xl mx-auto flex items-center justify-center text-xl font-bold">
+            <div className="p-6 rounded-2xl bg-white border border-indigo-50 shadow-xs hover:shadow-md hover:border-indigo-200 transition-all space-y-3 text-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-2xl mx-auto flex items-center justify-center text-lg font-black shadow-md shadow-indigo-500/20">
                 2
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Weighed & Invoiced via SMS</h4>
+              <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">Weighed & Invoiced via SMS</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Rider collects your bags. Our facility weighs and inspects your garments, and texts you an itemized SMS invoice.
               </p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-center">
-              <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-xl mx-auto flex items-center justify-center text-xl font-bold">
+            <div className="p-6 rounded-2xl bg-white border border-indigo-50 shadow-xs hover:shadow-md hover:border-blue-200 transition-all space-y-3 text-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl mx-auto flex items-center justify-center text-lg font-black shadow-md shadow-blue-500/20">
                 3
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Delivered Fresh & Pay</h4>
+              <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">Delivered Fresh & Pay</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Receive your fresh garments neatly folded and protected. Settle payment conveniently upon delivery via M-Pesa or Cash.
               </p>
@@ -723,9 +779,9 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
       </section>
 
       {/* Feedback / Review & Testimonials Section */}
-      <section id="reviews" className="py-14 max-w-6xl mx-auto px-4 sm:px-6 w-full space-y-12">
+      <section id="reviews" className="py-16 max-w-6xl mx-auto px-4 sm:px-6 w-full space-y-12 relative z-10">
         <div className="text-center max-w-2xl mx-auto space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+          <span className="text-xs font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
             Customer Feedback & Reviews
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
@@ -737,20 +793,20 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
         </div>
 
         {/* Aggregate Ratings & Testimonial Filters */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="bg-white rounded-3xl border border-indigo-100 p-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-5">
-            <div className="text-center border-r border-slate-200 pr-5">
+            <div className="text-center border-r border-indigo-50/50 pr-5 shrink-0">
               <span className="text-4xl font-black text-slate-900 block">{averageRating}</span>
               <div className="flex text-amber-400 mt-1 justify-center">
                 {[1, 2, 3, 4, 5].map(star => (
                   <Star key={star} className="w-4 h-4 fill-amber-400 text-amber-400" />
                 ))}
               </div>
-              <span className="text-[10px] text-slate-400 font-semibold block mt-1">Out of 5.0 Stars</span>
+              <span className="text-[10px] text-slate-400 font-bold block mt-1">Out of 5.0 Stars</span>
             </div>
 
             <div className="space-y-1">
-              <h3 className="font-bold text-slate-900 text-sm">Over 140+ Customers Served</h3>
+              <h3 className="font-extrabold text-slate-900 text-sm">Over 140+ Customers Served</h3>
               <p className="text-xs text-slate-500">
                 100% verified doorstep pickups with 98% on-time delivery rate across Nairobi and environs.
               </p>
@@ -764,9 +820,9 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 key={filter}
                 type="button"
                 onClick={() => setReviewFilter(filter)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                className={`text-xs font-extrabold px-3.5 py-2 rounded-xl border transition-all cursor-pointer ${
                   reviewFilter === filter
-                    ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-sm"
                     : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                 }`}
               >
@@ -781,7 +837,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
           {filteredReviews.map((rev) => (
             <div
               key={rev.id}
-              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow"
+              className="bg-white rounded-2xl border border-indigo-50/80 p-5 shadow-2xs flex flex-col justify-between hover:shadow-md hover:border-purple-200/50 transition-all"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -809,26 +865,26 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
 
               <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-black text-[11px] flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 text-indigo-700 font-black text-[11px] flex items-center justify-center">
                     {rev.customerName.charAt(0)}
                   </div>
                   <div>
                     <h5 className="font-bold text-xs text-slate-900 leading-tight">{rev.customerName}</h5>
                     {rev.serviceUsed && (
-                      <span className="text-[10px] text-slate-400 block">{rev.serviceUsed}</span>
+                      <span className="text-[10px] text-slate-400 block font-medium">{rev.serviceUsed}</span>
                     )}
                   </div>
                 </div>
-                <span className="text-[10px] text-slate-400">{rev.date}</span>
+                <span className="text-[10px] text-slate-400 font-medium">{rev.date}</span>
               </div>
             </div>
           ))}
         </div>
 
         {/* Leave a Review / Feedback Form */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm max-w-2xl mx-auto space-y-6">
+        <div className="bg-white rounded-3xl border border-indigo-100 p-6 sm:p-8 shadow-md max-w-2xl mx-auto space-y-6">
           <div className="text-center space-y-1">
-            <div className="w-10 h-10 bg-amber-100 text-amber-700 rounded-xl mx-auto flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl mx-auto flex items-center justify-center shadow-md">
               <MessageSquare className="w-5 h-5" />
             </div>
             <h3 className="text-xl font-black text-slate-900">Leave Your Feedback</h3>
@@ -876,7 +932,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   </button>
                 ))}
               </div>
-              <span className="text-[11px] text-slate-400 block text-center mt-1">
+              <span className="text-[11px] text-slate-400 block text-center mt-1 font-bold">
                 {reviewRating === 5 && "Exceptional service (5/5)"}
                 {reviewRating === 4 && "Great service (4/5)"}
                 {reviewRating === 3 && "Average service (3/5)"}
@@ -896,7 +952,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                   value={reviewName}
                   onChange={(e) => setReviewName(e.target.value)}
                   placeholder="e.g. Joy K."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white"
                 />
               </div>
 
@@ -907,7 +963,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 <select
                   value={reviewService}
                   onChange={(e) => setReviewService(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white font-medium"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white font-semibold text-slate-800"
                 >
                   <option value="Wash & Fold">Wash & Fold</option>
                   <option value="Suit Dry Cleaning">Suit Dry Cleaning</option>
@@ -928,14 +984,14 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 value={reviewComment}
                 onChange={(e) => setReviewComment(e.target.value)}
                 placeholder="How was the collection speed, clothes freshness, ironing quality, and delivery rider?"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white resize-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white resize-none"
               />
             </div>
 
             <button
               type="submit"
               disabled={submittingReview}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 px-4 rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-amber-500/20 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-indigo-500/20 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
             >
               {submittingReview ? (
                 "Submitting Review..."
@@ -950,11 +1006,11 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-10 border-t border-slate-800 text-xs">
+      <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 text-xs relative z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 grid sm:grid-cols-3 gap-8">
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-center gap-2 text-white font-bold text-base">
-              <span>✨</span> Sparkle Spins
+              <span className="w-6 h-6 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 flex items-center justify-center text-xs">✨</span> Sparkle Spins
             </div>
             <p className="text-slate-400 leading-relaxed text-xs">
               Reliable laundry, dry cleaning, and garment care with scheduled doorstep collection and delivery.
@@ -975,7 +1031,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
               <button
                 type="button"
                 onClick={onBackToDashboard}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer"
               >
                 Go to Dashboard
               </button>
@@ -984,7 +1040,7 @@ export const CustomerPage: React.FC<CustomerPageProps> = ({
                 <button
                   type="button"
                   onClick={onGoToDashboard || onGoToLogin}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1"
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1"
                 >
                   <Truck className="w-3.5 h-3.5" /> Operations Dashboard
                 </button>

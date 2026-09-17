@@ -56,3 +56,50 @@ export async function saveReviewToFirestore(review: any): Promise<boolean> {
     return false;
   }
 }
+
+// Direct Firestore write for payments as a seamless fallback
+export async function savePaymentToFirestore(payment: any, updatedOrder: Order): Promise<boolean> {
+  if (!db) return false;
+  try {
+    // 1. Save payment document
+    await setDoc(doc(db, "payments", payment.id), {
+      ...payment,
+      date: payment.date || new Date().toISOString()
+    });
+
+    // 2. Update order document with payment info
+    await setDoc(doc(db, "orders", updatedOrder.id), {
+      ...updatedOrder,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    return true;
+  } catch (err) {
+    console.error("[Firebase Client] Failed to save payment to Firestore:", err);
+    return false;
+  }
+}
+
+// Direct Firestore write for order status updates as a seamless fallback
+export async function updateOrderStatusInFirestore(orderId: string, status: string, driverId?: string, proofOfDelivery?: string): Promise<boolean> {
+  if (!db) return false;
+  try {
+    const updateData: any = {
+      status,
+      updatedAt: new Date().toISOString()
+    };
+    if (proofOfDelivery !== undefined) {
+      updateData.proofOfDelivery = proofOfDelivery;
+    }
+    if (driverId !== undefined) {
+      updateData.driverId = driverId || "";
+    }
+
+    await setDoc(doc(db, "orders", orderId), updateData, { merge: true });
+    return true;
+  } catch (err) {
+    console.error("[Firebase Client] Failed to update order status in Firestore:", err);
+    return false;
+  }
+}
+

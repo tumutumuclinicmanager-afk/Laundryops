@@ -22,7 +22,7 @@ import { InvoiceModal } from "./components/InvoiceModal";
 import { OrderDetailModal } from "./components/OrderDetailModal";
 import { LoginScreen } from "./components/LoginScreen";
 import { CustomerPage } from "./components/CustomerPage";
-import { saveOrderToFirestore, saveReviewToFirestore } from "./firebase";
+import { saveOrderToFirestore, saveReviewToFirestore, savePaymentToFirestore, updateOrderStatusInFirestore } from "./firebase";
 import { Truck, Package, Users, DollarSign, Settings, LayoutDashboard, Smartphone, Plus, ShieldCheck, LogOut, User, Globe } from "lucide-react";
 
 export default function App() {
@@ -159,6 +159,7 @@ export default function App() {
   };
 
   const handleUpdateStatus = async (orderId: string, status: OrderStatus, driverId?: string, proofOfDelivery?: string) => {
+    let apiSuccess = false;
     try {
       const res = await fetch(`/api/orders/${orderId}/status`, {
         method: "PATCH",
@@ -166,14 +167,59 @@ export default function App() {
         body: JSON.stringify({ status, driverId, proofOfDelivery })
       });
       if (res.ok) {
+        apiSuccess = true;
         fetchData();
         if (selectedOrderForDetail && selectedOrderForDetail.id === orderId) {
           const updated = await res.json();
           setSelectedOrderForDetail(updated);
         }
+      } else {
+        console.warn("[Orders] API returned non-ok status for status update, attempting direct Firestore save fallback.");
       }
     } catch (e) {
-      console.error("Failed to update status", e);
+      console.warn("[Orders] API status update failed, attempting direct Firestore save fallback:", e);
+    }
+
+    if (!apiSuccess) {
+      try {
+        const saved = await updateOrderStatusInFirestore(orderId, status, driverId, proofOfDelivery);
+        if (saved) {
+          // Immediately update local React state to make the UI update seamlessly
+          setOrders(prev => prev.map(o => {
+            if (o.id === orderId) {
+              const updatedOrder: Order = {
+                ...o,
+                status,
+                updatedAt: new Date().toISOString()
+              };
+              if (proofOfDelivery !== undefined) {
+                updatedOrder.proofOfDelivery = proofOfDelivery;
+              }
+              if (driverId !== undefined) {
+                updatedOrder.driverId = driverId || "";
+                if (driverId) {
+                  const d = drivers.find(dr => dr.id === driverId);
+                  updatedOrder.driverName = d ? d.name : "";
+                } else {
+                  updatedOrder.driverName = "";
+                }
+              }
+
+              if (selectedOrderForDetail && selectedOrderForDetail.id === orderId) {
+                setSelectedOrderForDetail(updatedOrder);
+              }
+              return updatedOrder;
+            }
+            return o;
+          }));
+          fetchData();
+        } else {
+          alert("Failed to update status in Firestore. Please check your connection.");
+        }
+      } catch (fallbackErr) {
+        console.error("Direct order status update fallback failed:", fallbackErr);
+        alert("An error occurred while attempting to update the order status.");
+      }
     }
   };
 
@@ -244,6 +290,7 @@ export default function App() {
   };
 
   const handleSubmitPayment = async (payData: any) => {
+    let apiSuccess = false;
     try {
       const res = await fetch("/api/payments", {
         method: "POST",
@@ -251,11 +298,69 @@ export default function App() {
         body: JSON.stringify(payData)
       });
       if (res.ok) {
+        apiSuccess = true;
         setSelectedOrderForPayment(null);
         fetchData();
+      } else {
+        console.warn("[Payments] API returned non-ok status, attempting direct Firestore save fallback.");
       }
     } catch (e) {
-      console.error("Failed to submit payment", e);
+      console.warn("[Payments] API call failed, attempting direct Firestore save fallback:", e);
+    }
+
+    // Direct client-side Firestore fallback if the server API failed or returned an error
+    if (!apiSuccess) {
+      try {
+        const orderToPay = orders.find(o => o.id === payData.orderId);
+        if (!orderToPay) {
+          alert("Error: Associated order not found in state.");
+          return;
+        }
+
+        const payAmt = Number(payData.amount);
+        const newAmountPaid = orderToPay.amountPaid + payAmt;
+        const newBalanceDue = Math.max(0, orderToPay.total - newAmountPaid);
+        let newPaymentStatus: 'Unpaid' | 'Partial' | 'Paid' = "Unpaid";
+        if (newBalanceDue === 0 && orderToPay.total > 0) {
+          newPaymentStatus = "Paid";
+        } else if (newAmountPaid > 0) {
+          newPaymentStatus = "Partial";
+        }
+
+        const updatedOrder: Order = {
+          ...orderToPay,
+          amountPaid: newAmountPaid,
+          balanceDue: newBalanceDue,
+          paymentStatus: newPaymentStatus,
+          updatedAt: new Date().toISOString()
+        };
+
+        const newPayment: Payment = {
+          id: "pay_" + Date.now(),
+          orderId: orderToPay.id,
+          orderNumber: orderToPay.orderNumber,
+          customerName: orderToPay.customerName,
+          amount: payAmt,
+          method: payData.method || "Cash",
+          reference: payData.reference || "",
+          date: new Date().toISOString(),
+          notes: payData.notes || ""
+        };
+
+        const saved = await savePaymentToFirestore(newPayment, updatedOrder);
+        if (saved) {
+          // Immediately update local React state to make the UI update seamlessly
+          setPayments(prev => [newPayment, ...prev.filter(p => p.id !== newPayment.id)]);
+          setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+          setSelectedOrderForPayment(null);
+          fetchData();
+        } else {
+          alert("Failed to save payment to Firestore. Please verify your connection.");
+        }
+      } catch (fallbackErr) {
+        console.error("Direct payment save fallback failed:", fallbackErr);
+        alert("An error occurred while attempting to save payment.");
+      }
     }
   };
 
@@ -680,6 +785,7 @@ export default function App() {
           <DriverView
             orders={orders}
             drivers={drivers}
+            currentDriverId={currentUser?.driverId}
             onUpdateStatus={handleUpdateStatus}
           />
         ) : (

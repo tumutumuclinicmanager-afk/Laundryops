@@ -5,15 +5,17 @@ import { Truck, Phone, MapPin, CheckCircle, Clock, Navigation, Check, AlertCircl
 interface DriverViewProps {
   orders: Order[];
   drivers: Driver[];
+  currentDriverId?: string;
   onUpdateStatus: (orderId: string, status: OrderStatus, driverId?: string, proofOfDelivery?: string) => void;
 }
 
 export const DriverView: React.FC<DriverViewProps> = ({
   orders,
   drivers,
+  currentDriverId,
   onUpdateStatus
 }) => {
-  const [selectedDriverId, setSelectedDriverId] = useState<string>(drivers[0]?.id || "");
+  const [selectedDriverId, setSelectedDriverId] = useState<string>(currentDriverId || drivers[0]?.id || "");
   const [proofNotes, setProofNotes] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'assigned' | 'completed'>('assigned');
   const [showMapModal, setShowMapModal] = useState<boolean>(false);
@@ -28,6 +30,7 @@ export const DriverView: React.FC<DriverViewProps> = ({
     let nextStatus: OrderStatus = order.status;
     if (order.status === 'Pickup Scheduled') nextStatus = 'Picked Up';
     else if (order.status === 'Picked Up') nextStatus = 'In Process';
+    else if (order.status === 'In Process') nextStatus = 'Ready for Delivery';
     else if (order.status === 'Ready for Delivery') nextStatus = 'Out for Delivery';
     else if (order.status === 'Out for Delivery') nextStatus = 'Delivered';
     else if (order.status === 'Delivered') nextStatus = 'Completed';

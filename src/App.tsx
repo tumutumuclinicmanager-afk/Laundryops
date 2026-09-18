@@ -22,6 +22,7 @@ import { InvoiceModal } from "./components/InvoiceModal";
 import { OrderDetailModal } from "./components/OrderDetailModal";
 import { LoginScreen } from "./components/LoginScreen";
 import { CustomerPage } from "./components/CustomerPage";
+import { CustomerLandingPage } from "./components/CustomerLandingPage";
 import { saveOrderToFirestore, saveReviewToFirestore, savePaymentToFirestore, updateOrderStatusInFirestore } from "./firebase";
 import { Truck, Package, Users, DollarSign, Settings, LayoutDashboard, Smartphone, Plus, ShieldCheck, LogOut, User, Globe } from "lucide-react";
 
@@ -567,7 +568,24 @@ export default function App() {
     );
   }
 
-  // Not logged in: Show Customer Page by default, with staff login toggle
+  // If currently previewing Customer Page
+  if (viewingCustomerPage) {
+    return (
+      <CustomerPage
+        services={services}
+        reviews={reviews}
+        onPlaceOrder={handleCustomerPlaceOrder}
+        onAddReview={handleAddReview}
+        onGoToLogin={() => setPublicScreen('login')}
+        onGoToDashboard={() => setViewingCustomerPage(false)}
+        isLoggedIn={Boolean(currentUser)}
+        currentUserRole={currentUser?.role}
+        onBackToDashboard={() => setViewingCustomerPage(false)}
+      />
+    );
+  }
+
+  // Not logged in: Show Customer Landing Page by default, with staff login toggle
   if (!currentUser) {
     if (publicScreen === 'login') {
       return (
@@ -590,31 +608,17 @@ export default function App() {
     }
 
     return (
-      <CustomerPage
+      <CustomerLandingPage
+        orders={orders}
         services={services}
         reviews={reviews}
+        onOpenCustomerPortal={() => setViewingCustomerPage(true)}
+        onOpenLogin={() => setPublicScreen('login')}
+        onCreateOrder={() => {
+          const el = document.getElementById('book-order');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }}
         onPlaceOrder={handleCustomerPlaceOrder}
-        onAddReview={handleAddReview}
-        onGoToLogin={() => setPublicScreen('login')}
-        onGoToDashboard={() => setPublicScreen('login')}
-        isLoggedIn={false}
-      />
-    );
-  }
-
-  // If logged in but currently previewing Customer Page
-  if (viewingCustomerPage) {
-    return (
-      <CustomerPage
-        services={services}
-        reviews={reviews}
-        onPlaceOrder={handleCustomerPlaceOrder}
-        onAddReview={handleAddReview}
-        onGoToLogin={() => {}}
-        onGoToDashboard={() => setViewingCustomerPage(false)}
-        isLoggedIn={true}
-        currentUserRole={currentUser.role}
-        onBackToDashboard={() => setViewingCustomerPage(false)}
       />
     );
   }

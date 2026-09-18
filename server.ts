@@ -776,6 +776,12 @@ app.put("/api/orders/:id", async (req, res) => {
 
     order.updatedAt = new Date().toISOString();
     await saveToFirestore("orders", order.id, order);
+
+    const memIdx = inMemoryOrders.findIndex(o => o.id === order.id);
+    if (memIdx >= 0) {
+      inMemoryOrders[memIdx] = { ...order };
+    }
+
     res.json(order);
   } catch (err: any) {
     console.error("[Orders] Update error:", err);

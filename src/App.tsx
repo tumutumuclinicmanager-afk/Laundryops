@@ -525,8 +525,9 @@ export default function App() {
         fetchData();
         return updated;
       }
-      throw new Error("Failed to update order");
-    } catch (e) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "Failed to update order");
+    } catch (e: any) {
       console.error("Failed to update order details", e);
       throw e;
     }

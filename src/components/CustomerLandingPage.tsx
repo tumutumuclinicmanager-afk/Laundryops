@@ -492,9 +492,10 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
               <h3 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Our Services</h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
               {services.map((service) => (
-                <div key={service.id} className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between hover:border-indigo-500/50 transition-all backdrop-blur-md">
+                <div key={service.id} className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between hover:border-indigo-500/60 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300 backdrop-blur-md relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-600/5 rounded-full blur-xl group-hover:bg-indigo-600/15 transition-all pointer-events-none" />
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
@@ -509,7 +510,7 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
                     className="w-full py-3 rounded-xl bg-white/5 hover:bg-indigo-600 text-slate-200 hover:text-white text-xs font-semibold transition-all border border-white/10 hover:border-indigo-600 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>Book Service</span>
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                   </button>
                 </div>
               ))}

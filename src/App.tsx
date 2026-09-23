@@ -613,7 +613,6 @@ export default function App() {
         orders={orders}
         services={services}
         reviews={reviews}
-        onOpenCustomerPortal={() => setViewingCustomerPage(true)}
         onOpenLogin={() => setPublicScreen('login')}
         onCreateOrder={() => {
           const el = document.getElementById('book-order');

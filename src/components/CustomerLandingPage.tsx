@@ -7,7 +7,6 @@ interface CustomerLandingPageProps {
   orders: Order[];
   services: ServiceItem[];
   reviews: Review[];
-  onOpenCustomerPortal: () => void;
   onOpenLogin: () => void;
   onCreateOrder: () => void;
   onPlaceOrder?: (orderData: any) => Promise<Order | null>;
@@ -16,7 +15,6 @@ interface CustomerLandingPageProps {
 export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
   services,
   reviews,
-  onOpenCustomerPortal,
   onOpenLogin,
   onPlaceOrder
 }) => {
@@ -143,13 +141,6 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
             >
               <LogIn className="w-4 h-4 text-indigo-400" />
               <span>Staff Portal</span>
-            </button>
-            <button
-              onClick={onOpenCustomerPortal}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
-            >
-              <User className="w-4 h-4" />
-              <span>My Account</span>
             </button>
           </div>
         </nav>
@@ -556,9 +547,6 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
             </div>
 
             <div className="flex items-center gap-6">
-              <button onClick={onOpenCustomerPortal} className="hover:text-white transition-colors cursor-pointer">
-                Customer Portal
-              </button>
               <button onClick={onOpenLogin} className="hover:text-white transition-colors cursor-pointer">
                 Staff / Admin Login
               </button>

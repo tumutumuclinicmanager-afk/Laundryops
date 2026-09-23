@@ -15,6 +15,7 @@ import {
   Copy,
   MessageSquare
 } from 'lucide-react';
+import { getExpertLaundryResponse } from '../utils/laundryKnowledge';
 
 export interface ChatMessage {
   id: string;
@@ -109,26 +110,28 @@ export const GeminiChatbot: React.FC<GeminiChatbotProps> = ({
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to get response from Gemini AI');
+        throw new Error(errData.error || 'API response was not ok');
       }
 
       const data = await response.json();
       const assistantMessage: ChatMessage = {
         id: 'msg_ai_' + Date.now(),
         role: 'assistant',
-        content: data.reply || "I'm ready for your next question!",
+        content: data.reply || getExpertLaundryResponse(query),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
       setMessages([...newHistory, assistantMessage]);
     } catch (err: any) {
-      const errorMessage: ChatMessage = {
-        id: 'msg_err_' + Date.now(),
+      console.warn('[GeminiChatbot] Server chat note, activating built-in knowledge engine:', err);
+      const fallbackText = getExpertLaundryResponse(query);
+      const assistantMessage: ChatMessage = {
+        id: 'msg_ai_' + Date.now(),
         role: 'assistant',
-        content: `⚠️ **Error:** ${err.message || 'Could not communicate with Gemini AI. Please check your network and try again.'}`,
+        content: fallbackText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
-      setMessages([...newHistory, errorMessage]);
+      setMessages([...newHistory, assistantMessage]);
     } finally {
       setIsLoading(false);
     }

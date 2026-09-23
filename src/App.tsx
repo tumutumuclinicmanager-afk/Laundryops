@@ -23,6 +23,7 @@ import { OrderDetailModal } from "./components/OrderDetailModal";
 import { LoginScreen } from "./components/LoginScreen";
 import { CustomerPage } from "./components/CustomerPage";
 import { CustomerLandingPage } from "./components/CustomerLandingPage";
+import { GeminiChatbot } from "./components/GeminiChatbot";
 import { saveOrderToFirestore, saveReviewToFirestore, savePaymentToFirestore, updateOrderStatusInFirestore } from "./firebase";
 import { Truck, Package, Users, DollarSign, Settings, LayoutDashboard, Smartphone, Plus, ShieldCheck, LogOut, User, Globe } from "lucide-react";
 
@@ -885,6 +886,12 @@ export default function App() {
           onOpenInvoice={(ord) => setSelectedOrderForInvoice(ord)}
         />
       )}
+
+      {/* Floating Gemini AI Assistant */}
+      <GeminiChatbot
+        floating={true}
+        systemRole="You are Sparkle AI Operations & Laundry Specialist, assisting laundry business staff, managers, and drivers with operations, stain treatments, wash formulas, customer messaging, route tips in Tumutumu and Karatina, and best laundry management practices. Be concise, precise, and professional."
+      />
     </div>
   );
 }

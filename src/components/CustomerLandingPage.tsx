@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Order, ServiceItem, Review } from '../types';
 import GhostFibers from './GhostFibers';
-import { Sparkles, Star, ArrowRight, ChevronRight, User, LogIn, MapPin, Phone, CheckCircle2, Truck, Clock, ShieldCheck, HeartHandshake } from 'lucide-react';
+import { Sparkles, Star, ArrowRight, ChevronRight, User, LogIn, MapPin, Phone, CheckCircle2, Truck, Clock, ShieldCheck, HeartHandshake, MessageSquare } from 'lucide-react';
+import { GeminiChatbot } from './GeminiChatbot';
 
 interface CustomerLandingPageProps {
   orders: Order[];
@@ -558,6 +559,9 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
           </div>
         </footer>
       </div>
+
+      {/* Floating Gemini AI Chatbot */}
+      <GeminiChatbot floating={true} />
     </div>
   );
 };

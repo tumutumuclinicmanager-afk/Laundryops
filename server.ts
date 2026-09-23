@@ -3,6 +3,16 @@ import path from "path";
 import fs from "fs";
 import { initializeApp, getApps, App } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 let firestore: Firestore | null = null;
 try {
@@ -987,6 +997,49 @@ app.post("/api/reviews", async (req, res) => {
   inMemoryReviews.unshift(newReview);
   saveToFirestore("reviews", newReview.id, newReview);
   res.status(201).json(newReview);
+});
+
+// 9. Gemini AI Laundry Assistant Chatbot (Multi-turn)
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { messages, model = "gemini-3.5-flash", systemInstruction } = req.body;
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "Messages array is required" });
+    }
+
+    const defaultSystemInstruction = `You are Sparkle AI, the friendly and expert Virtual Laundry Care Specialist for Sparkle Spins Laundry Co. (serving PCEA Tumutumu Hospital, Karatina Town, Mathira and nearby areas).
+
+Your capabilities & core knowledge:
+1. Operations & Pickups: We offer convenient doorstep laundry collection & delivery. Pickups can be scheduled directly on our web landing page. Pickups & deliveries operate daily. Turnaround is 24-48 hours. Payments are done safely on delivery (M-Pesa or Cash).
+2. Fabric Care & Stain Treatment: Offer immediate, practical stain removal advice for coffee, tea, wine, cooking oil, grease, blood, dirt/mud, grass, ink, makeup, sweat/deodorant, collar rings.
+3. Garment Types: Provide guidance on washing instructions for cottons, synthetics, delicates, silks, suits, heavy duvets, woolens, bedsheets, lab coats, and medical scrubs.
+4. Services: Wash & Fold (Standard & Bulk), Professional Steam Pressing, Dry Cleaning, Bedding & Comforter Care, Hospital Scrubs, Shoe/Sneaker Revitalization.
+5. Communication Style: Warm, empathetic, professional, clear, and structured (use bullet points or numbered steps when giving instructions). Keep answers concise and readable. Always sign off cheerfully!`;
+
+    // Map conversation history to Gemini parts
+    const contents = messages.map((m: { role: string; content?: string; text?: string }) => ({
+      role: m.role === "assistant" || m.role === "model" ? "model" : "user",
+      parts: [{ text: m.text || m.content || "" }]
+    }));
+
+    // Choose model based on request; default to gemini-3.5-flash or gemini-3.1-flash-lite
+    const chosenModel = model || "gemini-3.5-flash";
+
+    const response = await ai.models.generateContent({
+      model: chosenModel,
+      contents,
+      config: {
+        systemInstruction: systemInstruction || defaultSystemInstruction,
+      }
+    });
+
+    const reply = response.text || "I'm sorry, I could not generate a response. Please try again.";
+    res.json({ reply });
+  } catch (err: any) {
+    console.error("[Gemini Chat] Error:", err);
+    res.status(500).json({ error: err.message || "Failed to process chat with Gemini AI" });
+  }
 });
 
 // Vite middleware setup

@@ -103,3 +103,18 @@ export async function updateOrderStatusInFirestore(orderId: string, status: stri
   }
 }
 
+// Direct Firestore write for order items, weighing, and pricing updates as a seamless fallback
+export async function updateOrderDetailsInFirestore(orderId: string, updatedData: any): Promise<boolean> {
+  if (!db) return false;
+  try {
+    await setDoc(doc(db, "orders", orderId), {
+      ...updatedData,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error("[Firebase Client] Failed to update order details in Firestore:", err);
+    return false;
+  }
+}
+

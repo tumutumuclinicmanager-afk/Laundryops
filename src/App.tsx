@@ -24,7 +24,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { CustomerPage } from "./components/CustomerPage";
 import { CustomerLandingPage } from "./components/CustomerLandingPage";
 import { GeminiChatbot } from "./components/GeminiChatbot";
-import { saveOrderToFirestore, saveReviewToFirestore, savePaymentToFirestore, updateOrderStatusInFirestore } from "./firebase";
+import { saveOrderToFirestore, saveReviewToFirestore, savePaymentToFirestore, updateOrderStatusInFirestore, updateOrderDetailsInFirestore } from "./firebase";
 import { Truck, Package, Users, DollarSign, Settings, LayoutDashboard, Smartphone, Plus, ShieldCheck, LogOut, User, Globe } from "lucide-react";
 
 export default function App() {
@@ -517,6 +517,9 @@ export default function App() {
   };
 
   const handleUpdateOrderDetails = async (orderId: string, updatedData: any) => {
+    let apiSuccess = false;
+    let updatedOrderResult: Order | null = null;
+
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: "PUT",
@@ -524,18 +527,81 @@ export default function App() {
         body: JSON.stringify(updatedData)
       });
       if (res.ok) {
+        apiSuccess = true;
         const updated = await res.json();
+        updatedOrderResult = updated;
         setOrders(prev => prev.map(o => o.id === orderId ? updated : o));
-        setSelectedOrderForDetail(prev => prev && prev.id === orderId ? updated : prev);
+        setSelectedOrderForDetail(updated);
         fetchData();
         return updated;
       }
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || "Failed to update order");
+      console.warn("[Orders] API returned non-ok status for update details, attempting direct Firestore fallback.");
     } catch (e: any) {
-      console.error("Failed to update order details", e);
-      throw e;
+      console.warn("[Orders] API update failed, attempting direct Firestore fallback:", e);
     }
+
+    if (!apiSuccess) {
+      try {
+        const existingOrder = orders.find(o => o.id === orderId);
+        if (!existingOrder) throw new Error("Order not found in state");
+
+        let subtotal = existingOrder.subtotal;
+        let discount = updatedData.discount !== undefined ? Number(updatedData.discount) : existingOrder.discount;
+        let newItems = existingOrder.items;
+
+        if (updatedData.items && Array.isArray(updatedData.items)) {
+          newItems = updatedData.items.map((it: any) => {
+            const qty = Number(it.quantity) || 1;
+            const unitPrice = Number(it.unitPrice) || 0;
+            return {
+              serviceId: String(it.serviceId || "custom"),
+              serviceName: String(it.serviceName || "Laundry Item"),
+              unit: String(it.unit || "item"),
+              quantity: qty,
+              unitPrice,
+              subtotal: qty * unitPrice
+            };
+          });
+          subtotal = newItems.reduce((sum, it) => sum + it.subtotal, 0);
+        }
+
+        const total = Math.max(0, subtotal - discount);
+        const amountPaid = existingOrder.amountPaid || 0;
+        const balanceDue = Math.max(0, total - amountPaid);
+        let paymentStatus: 'Unpaid' | 'Partial' | 'Paid' = "Unpaid";
+        if (balanceDue === 0 && total > 0 && amountPaid >= total) {
+          paymentStatus = "Paid";
+        } else if (amountPaid > 0) {
+          paymentStatus = "Partial";
+        }
+
+        const updatedOrder: Order = {
+          ...existingOrder,
+          ...updatedData,
+          items: newItems,
+          subtotal,
+          discount,
+          total,
+          balanceDue,
+          paymentStatus,
+          updatedAt: new Date().toISOString()
+        };
+
+        const saved = await updateOrderDetailsInFirestore(orderId, updatedOrder);
+        if (saved) {
+          setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+          setSelectedOrderForDetail(updatedOrder);
+          fetchData();
+          return updatedOrder;
+        } else {
+          throw new Error("Failed to save updated pricing to database");
+        }
+      } catch (fallbackErr: any) {
+        console.error("Direct order details fallback failed:", fallbackErr);
+        throw fallbackErr;
+      }
+    }
+    return updatedOrderResult;
   };
 
   const handleSendInvoice = async (orderId: string, customMessage?: string): Promise<boolean> => {

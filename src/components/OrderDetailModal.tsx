@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Order, Driver, OrderStatus, ServiceItem, OrderItem } from "../types";
 import { generateWhatsAppMessage, openWhatsAppChat } from "../utils/whatsapp";
 import {
@@ -29,7 +29,8 @@ import {
   Printer,
   Inbox,
   Eye,
-  RefreshCw
+  RefreshCw,
+  Scale
 } from "lucide-react";
 
 interface OrderDetailModalProps {
@@ -66,11 +67,21 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   onOpenPaymentModal,
   onOpenInvoice
 }) => {
+  const [activeOrder, setActiveOrder] = useState<Order>(order);
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [driverId, setDriverId] = useState<string>(order.driverId || "");
   const [proof, setProof] = useState<string>(order.proofOfDelivery || "");
   const [deliveryDate, setDeliveryDate] = useState<string>(order.deliveryDate || "");
   const [deliveryTimeWindow, setDeliveryTimeWindow] = useState<string>(order.deliveryTimeWindow || "");
+
+  // Edit Items & Pricing Mode (for facility staff after weighing laundry)
+  const [isEditingItems, setIsEditingItems] = useState<boolean>(false);
+  const [editableItems, setEditableItems] = useState<OrderItem[]>(
+    order.items && order.items.length > 0 ? order.items.map(item => ({ ...item })) : []
+  );
+  const [editableDiscount, setEditableDiscount] = useState<number>(order.discount || 0);
+  const [isSavingItems, setIsSavingItems] = useState<boolean>(false);
+  const [itemSaveSuccess, setItemSaveSuccess] = useState<string | null>(null);
 
   // Pre-delivery invoice sending dialog
   const [showInvoiceDialog, setShowInvoiceDialog] = useState<boolean>(false);
@@ -80,14 +91,17 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const [invoiceErrorMessage, setInvoiceErrorMessage] = useState<string | null>(null);
   const [copiedInvoice, setCopiedInvoice] = useState<boolean>(false);
 
-  // Edit Items & Pricing Mode (for facility staff after weighing laundry)
-  const [isEditingItems, setIsEditingItems] = useState<boolean>(false);
-  const [editableItems, setEditableItems] = useState<OrderItem[]>(
-    order.items.map(item => ({ ...item }))
-  );
-  const [editableDiscount, setEditableDiscount] = useState<number>(order.discount || 0);
-  const [isSavingItems, setIsSavingItems] = useState<boolean>(false);
-  const [itemSaveSuccess, setItemSaveSuccess] = useState<string | null>(null);
+  // Sync state when order prop updates
+  useEffect(() => {
+    setActiveOrder(order);
+    setStatus(order.status);
+    setDriverId(order.driverId || "");
+    setProof(order.proofOfDelivery || "");
+    setDeliveryDate(order.deliveryDate || "");
+    setDeliveryTimeWindow(order.deliveryTimeWindow || "");
+    setEditableItems(order.items && order.items.length > 0 ? order.items.map(it => ({ ...it })) : []);
+    setEditableDiscount(order.discount || 0);
+  }, [order]);
 
   // General Delivery Update SMS dialog
   const [showSmsDialog, setShowSmsDialog] = useState<boolean>(false);
@@ -106,24 +120,23 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const [emailSuccessMessage, setEmailSuccessMessage] = useState<string | null>(null);
   const [emailErrorMessage, setEmailErrorMessage] = useState<string | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
-  const [activeOrder, setActiveOrder] = useState<Order>(order);
 
   // Customer email editing
   const [isEditingEmail, setIsEditingEmail] = useState<boolean>(false);
   const [tempEmail, setTempEmail] = useState<string>(order.customerEmail || "");
 
-  const assignedDriver = drivers.find(d => d.id === driverId) || (order.driverName ? { name: order.driverName } : null);
+  const assignedDriver = drivers.find(d => d.id === driverId) || (activeOrder.driverName ? { name: activeOrder.driverName } : null);
 
   // WhatsApp notification state (auto-placed when status changes to Ready for Delivery)
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState<boolean>(order.status === 'Ready for Delivery');
   const [whatsappMessage, setWhatsappMessage] = useState<string>(
-    generateWhatsAppMessage(order, order.status, assignedDriver?.name)
+    generateWhatsAppMessage(activeOrder, activeOrder.status, assignedDriver?.name)
   );
   const [whatsappSentSuccess, setWhatsappSentSuccess] = useState<boolean>(false);
 
   const handleStatusChange = (newStatus: OrderStatus) => {
     setStatus(newStatus);
-    const msg = generateWhatsAppMessage(order, newStatus, assignedDriver?.name);
+    const msg = generateWhatsAppMessage(activeOrder, newStatus, assignedDriver?.name);
     setWhatsappMessage(msg);
     if (newStatus === 'Ready for Delivery') {
       setShowWhatsAppDialog(true);
@@ -131,34 +144,34 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   };
 
   // Generate standard pre-delivery invoice text
-  const itemsText = order.items.length > 0
-    ? order.items.map(it => `• ${it.serviceName} (${it.quantity} ${it.unit}): KSh ${it.subtotal.toLocaleString()}`).join("\n")
+  const itemsText = activeOrder.items && activeOrder.items.length > 0
+    ? activeOrder.items.map(it => `• ${it.serviceName} (${it.quantity} ${it.unit}): KSh ${it.subtotal.toLocaleString()}`).join("\n")
     : "• Pending facility weighing & itemization";
 
   const defaultInvoiceSmsText = `✨ Sparkle Spins PRE-DELIVERY INVOICE
-Order: ${order.orderNumber}
-Customer: ${order.customerName}
-Delivery: ${order.deliveryDate} (${order.deliveryTimeWindow})
+Order: ${activeOrder.orderNumber}
+Customer: ${activeOrder.customerName}
+Delivery: ${activeOrder.deliveryDate} (${activeOrder.deliveryTimeWindow})
 ${assignedDriver?.name ? `Assigned Rider: ${assignedDriver.name}` : ""}
 
 Itemized Breakdown:
 ${itemsText}
 
-Subtotal: KSh ${order.subtotal.toLocaleString()}
-${order.discount > 0 ? `Discount: -KSh ${order.discount.toLocaleString()}\n` : ""}TOTAL DUE ON DELIVERY: KSh ${order.total.toLocaleString()}
+Subtotal: KSh ${activeOrder.subtotal.toLocaleString()}
+${activeOrder.discount > 0 ? `Discount: -KSh ${activeOrder.discount.toLocaleString()}\n` : ""}TOTAL DUE ON DELIVERY: KSh ${activeOrder.total.toLocaleString()}
 
 *Note: Payment is collected on delivery via M-Pesa or Cash, NOT on pickup.
 Thank you for choosing Sparkle Spins!`;
 
-  const defaultFormattedSms = `Hello ${order.customerName}, Sparkle Spins update for Order ${order.orderNumber}: Status is '${status}'. Delivery scheduled: ${deliveryDate || order.deliveryDate} (${deliveryTimeWindow || order.deliveryTimeWindow}).${
+  const defaultFormattedSms = `Hello ${activeOrder.customerName}, Sparkle Spins update for Order ${activeOrder.orderNumber}: Status is '${status}'. Delivery scheduled: ${deliveryDate || activeOrder.deliveryDate} (${deliveryTimeWindow || activeOrder.deliveryTimeWindow}).${
     assignedDriver?.name ? ` Assigned Rider: ${assignedDriver.name}.` : ""
-  }${order.balanceDue > 0 ? ` Total Due on Delivery: KSh ${order.balanceDue.toLocaleString()}.` : ' Status: Paid in full.'} Thank you for choosing Sparkle Spins!`;
+  }${activeOrder.balanceDue > 0 ? ` Total Due on Delivery: KSh ${activeOrder.balanceDue.toLocaleString()}.` : ' Status: Paid in full.'} Thank you for choosing Sparkle Spins!`;
 
   // Handle Saving Status & Driver Changes
   const handleSave = async () => {
-    onUpdateStatus(order.id, status, driverId || undefined, proof);
-    if (onUpdateOrderDetails && (deliveryDate !== order.deliveryDate || deliveryTimeWindow !== order.deliveryTimeWindow)) {
-      await onUpdateOrderDetails(order.id, {
+    onUpdateStatus(activeOrder.id, status, driverId || undefined, proof);
+    if (onUpdateOrderDetails && (deliveryDate !== activeOrder.deliveryDate || deliveryTimeWindow !== activeOrder.deliveryTimeWindow)) {
+      await onUpdateOrderDetails(activeOrder.id, {
         deliveryDate,
         deliveryTimeWindow,
         status,
@@ -178,9 +191,9 @@ Thank you for choosing Sparkle Spins!`;
       let success = false;
 
       if (onSendInvoice) {
-        success = await onSendInvoice(order.id, message);
+        success = await onSendInvoice(activeOrder.id, message);
       } else {
-        const res = await fetch(`/api/orders/${order.id}/send-invoice`, {
+        const res = await fetch(`/api/orders/${activeOrder.id}/send-invoice`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ customMessage: message })
@@ -189,7 +202,7 @@ Thank you for choosing Sparkle Spins!`;
       }
 
       if (success) {
-        setInvoiceSuccessMessage(`Pre-delivery invoice successfully sent to ${order.customerPhone}`);
+        setInvoiceSuccessMessage(`Pre-delivery invoice successfully sent to ${activeOrder.customerPhone}`);
         setTimeout(() => {
           setShowInvoiceDialog(false);
           setInvoiceSuccessMessage(null);
@@ -213,10 +226,9 @@ Thank you for choosing Sparkle Spins!`;
   };
 
   // WhatsApp share link
-  const cleanPhone = order.customerPhone.replace(/[^0-9]/g, "");
+  const cleanPhone = activeOrder.customerPhone.replace(/[^0-9]/g, "");
   const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(invoiceCustomMessage.trim() || defaultInvoiceSmsText)}`;
 
-  // Handle general SMS notification
   // Handle email notification dispatch
   const handleSendOrderEmail = async () => {
     if (!emailRecipient.trim()) {
@@ -232,7 +244,7 @@ Thank you for choosing Sparkle Spins!`;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderId: order.id,
+          orderId: activeOrder.id,
           type: emailType,
           recipientEmail: emailRecipient.trim(),
           customSubject: emailCustomSubject.trim() || undefined,
@@ -267,7 +279,7 @@ Thank you for choosing Sparkle Spins!`;
     setIsSendingSms(true);
     setSmsError(null);
     try {
-      const res = await fetch(`/api/orders/${order.id}/send-sms`, {
+      const res = await fetch(`/api/orders/${activeOrder.id}/send-sms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -280,7 +292,7 @@ Thank you for choosing Sparkle Spins!`;
         throw new Error(data.error || "Failed to dispatch SMS");
       }
 
-      setSmsSuccessMessage(`SMS successfully dispatched to ${order.customerPhone}`);
+      setSmsSuccessMessage(`SMS successfully dispatched to ${activeOrder.customerPhone}`);
       setTimeout(() => {
         setShowSmsDialog(false);
         setSmsSuccessMessage(null);
@@ -294,7 +306,7 @@ Thank you for choosing Sparkle Spins!`;
 
   const handleSaveCustomerEmail = async () => {
     if (onUpdateOrderDetails) {
-      await onUpdateOrderDetails(order.id, {
+      await onUpdateOrderDetails(activeOrder.id, {
         customerEmail: tempEmail.trim()
       });
       setActiveOrder(prev => ({ ...prev, customerEmail: tempEmail.trim() }));
@@ -315,16 +327,37 @@ Thank you for choosing Sparkle Spins!`;
   const handleItemFieldChange = (index: number, field: 'quantity' | 'unitPrice' | 'serviceName' | 'unit', value: any) => {
     const updated = [...editableItems];
     if (field === 'quantity') {
-      const qty = Math.max(0.1, Number(value) || 0);
+      const qty = Math.max(0.01, Number(value) || 0);
       updated[index].quantity = qty;
-      updated[index].subtotal = qty * updated[index].unitPrice;
+      updated[index].subtotal = Math.round(qty * updated[index].unitPrice);
     } else if (field === 'unitPrice') {
       const price = Math.max(0, Number(value) || 0);
       updated[index].unitPrice = price;
-      updated[index].subtotal = updated[index].quantity * price;
+      updated[index].subtotal = Math.round(updated[index].quantity * price);
     } else {
       updated[index][field] = value;
     }
+    setEditableItems(updated);
+  };
+
+  const handleServiceSelect = (index: number, serviceId: string) => {
+    const matched = services.find(s => s.id === serviceId);
+    if (!matched) return;
+    const updated = [...editableItems];
+    updated[index].serviceId = matched.id;
+    updated[index].serviceName = matched.name;
+    updated[index].unit = matched.unit;
+    updated[index].unitPrice = matched.price;
+    updated[index].subtotal = Math.round(updated[index].quantity * matched.price);
+    setEditableItems(updated);
+  };
+
+  const handleAddWeight = (index: number, delta: number) => {
+    const updated = [...editableItems];
+    const currentQty = Number(updated[index].quantity) || 0;
+    const newQty = Math.max(0.1, Math.round((currentQty + delta) * 10) / 10);
+    updated[index].quantity = newQty;
+    updated[index].subtotal = Math.round(newQty * updated[index].unitPrice);
     setEditableItems(updated);
   };
 
@@ -334,8 +367,8 @@ Thank you for choosing Sparkle Spins!`;
       ...editableItems,
       {
         serviceId: defaultService?.id || "custom",
-        serviceName: defaultService?.name || "Additional Laundry Item",
-        unit: defaultService?.unit || "item",
+        serviceName: defaultService?.name || "Wash & Fold (Standard Bag)",
+        unit: defaultService?.unit || "kg",
         quantity: 1,
         unitPrice: defaultService?.price || 150,
         subtotal: defaultService?.price || 150
@@ -349,18 +382,48 @@ Thank you for choosing Sparkle Spins!`;
   };
 
   const handleSaveItemsAndPricing = async () => {
+    const subtotal = editableItems.reduce((sum, it) => sum + (Number(it.quantity) * Number(it.unitPrice)), 0);
+    const discount = Number(editableDiscount) || 0;
+    const total = Math.max(0, subtotal - discount);
+    const amountPaid = activeOrder.amountPaid || 0;
+    const balanceDue = Math.max(0, total - amountPaid);
+    let paymentStatus: 'Unpaid' | 'Partial' | 'Paid' = "Unpaid";
+    if (balanceDue === 0 && total > 0 && amountPaid >= total) {
+      paymentStatus = "Paid";
+    } else if (amountPaid > 0) {
+      paymentStatus = "Partial";
+    }
+
+    const locallyUpdated: Order = {
+      ...activeOrder,
+      items: editableItems,
+      subtotal,
+      discount,
+      total,
+      balanceDue,
+      paymentStatus,
+      updatedAt: new Date().toISOString()
+    };
+
+    setActiveOrder(locallyUpdated);
+    setWhatsappMessage(generateWhatsAppMessage(locallyUpdated, status, assignedDriver?.name));
+
     if (!onUpdateOrderDetails) {
       setIsEditingItems(false);
       return;
     }
+
     setIsSavingItems(true);
     setItemSaveSuccess(null);
     try {
-      await onUpdateOrderDetails(order.id, {
+      const savedResult = await onUpdateOrderDetails(activeOrder.id, {
         items: editableItems,
         discount: editableDiscount
       });
-      setItemSaveSuccess("Pricing and items updated! You can now send the updated invoice to the client.");
+      if (savedResult) {
+        setActiveOrder(savedResult);
+      }
+      setItemSaveSuccess("Pricing and items successfully updated! You can now send the updated pre-delivery invoice.");
       setTimeout(() => {
         setIsEditingItems(false);
         setItemSaveSuccess(null);
@@ -761,7 +824,7 @@ Thank you for choosing Sparkle Spins!`;
                 </div>
               </div>
 
-              {order.invoiceSent ? (
+              {activeOrder.invoiceSent ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full self-start sm:self-auto border border-emerald-300">
                   <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                   Invoice Sent
@@ -774,21 +837,21 @@ Thank you for choosing Sparkle Spins!`;
               )}
             </div>
 
-            {order.invoiceSent && order.invoiceSentAt && (
+            {activeOrder.invoiceSent && activeOrder.invoiceSentAt && (
               <p className="text-[11px] text-emerald-800 font-medium bg-white/70 p-2 rounded-xl border border-emerald-200">
-                ✓ Itemized price was dispatched to <strong className="text-emerald-950">{order.customerPhone}</strong> on {new Date(order.invoiceSentAt).toLocaleString()}.
+                ✓ Itemized price was dispatched to <strong className="text-emerald-950">{activeOrder.customerPhone}</strong> on {new Date(activeOrder.invoiceSentAt).toLocaleString()}.
               </p>
             )}
 
-            {!order.invoiceSent && (
+            {!activeOrder.invoiceSent && (
               <p className="text-xs text-amber-900 leading-relaxed bg-white/70 p-2.5 rounded-xl border border-amber-200">
-                {order.items.length === 0 ? (
+                {activeOrder.items && activeOrder.items.length === 0 ? (
                   <>
                     ⚠️ The client placed a doorstep pickup order without upfront pricing. <strong>Please click &quot;Weigh / Edit Items &amp; Price&quot; below</strong> to enter the measured weights, services, and final price before dispatching the invoice SMS.
                   </>
                 ) : (
                   <>
-                    The client placed this order without seeing final prices. Send this invoice now so they inspect their exact bill (Total: <strong>KSh {order.total.toLocaleString()}</strong>) prior to rider arrival.
+                    The client placed this order without seeing final prices. Send this invoice now so they inspect their exact bill (Total: <strong>KSh {activeOrder.total.toLocaleString()}</strong>) prior to rider arrival.
                   </>
                 )}
               </p>
@@ -801,12 +864,12 @@ Thank you for choosing Sparkle Spins!`;
                 className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5 text-blue-400" />
-                {order.invoiceSent ? "Resend / Share Invoice" : "Send Invoice to Client"}
+                {activeOrder.invoiceSent ? "Resend / Share Invoice" : "Send Invoice to Client"}
               </button>
 
               <button
                 type="button"
-                onClick={() => onOpenInvoice(order)}
+                onClick={() => onOpenInvoice(activeOrder)}
                 className="bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5 text-slate-500" />
@@ -922,8 +985,8 @@ Thank you for choosing Sparkle Spins!`;
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div className="border border-slate-200/80 p-3.5 rounded-xl bg-slate-50/50">
               <span className="font-bold text-slate-400 uppercase tracking-wider block mb-1">Pickup Schedule</span>
-              <div className="font-bold text-slate-900">{order.pickupDate}</div>
-              <div className="text-slate-600 mt-0.5">{order.pickupTimeWindow}</div>
+              <div className="font-bold text-slate-900">{activeOrder.pickupDate}</div>
+              <div className="text-slate-600 mt-0.5">{activeOrder.pickupTimeWindow}</div>
             </div>
             <div className="border border-slate-200/80 p-3.5 rounded-xl bg-slate-50/50">
               <span className="font-bold text-slate-400 uppercase tracking-wider block mb-1">Delivery Schedule</span>
@@ -994,105 +1057,162 @@ Thank you for choosing Sparkle Spins!`;
             )}
 
             {isEditingItems ? (
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              <div className="bg-slate-50 border-2 border-indigo-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+                    <Scale className="w-4 h-4 text-indigo-600" />
+                    <span>Facility Laundry Weighing & Itemization Station</span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">Pick catalog service or type custom items</span>
+                </div>
+
+                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                   {editableItems.map((item, idx) => (
-                    <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 flex flex-wrap sm:flex-nowrap items-center gap-2 shadow-2xs">
-                      <div className="flex-1 min-w-[140px]">
-                        <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Item Name</label>
-                        <input
-                          type="text"
-                          value={item.serviceName}
-                          onChange={(e) => handleItemFieldChange(idx, 'serviceName', e.target.value)}
-                          className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900"
-                        />
+                    <div key={idx} className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                        {/* Service catalog picker / Name */}
+                        <div className="sm:col-span-5">
+                          <label className="text-[10px] font-bold text-slate-400 block mb-0.5">
+                            Service / Garment Type
+                          </label>
+                          {services.length > 0 && (
+                            <select
+                              value={item.serviceId}
+                              onChange={(e) => handleServiceSelect(idx, e.target.value)}
+                              className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900 mb-1.5 focus:bg-white"
+                            >
+                              <option value="custom">-- Select Catalog Service --</option>
+                              {services.map(s => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name} ({s.unit}) - KSh {s.price.toLocaleString()}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <input
+                            type="text"
+                            value={item.serviceName}
+                            onChange={(e) => handleItemFieldChange(idx, 'serviceName', e.target.value)}
+                            placeholder="Item description"
+                            className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900 focus:bg-white"
+                          />
+                        </div>
+
+                        {/* Quantity / Measured Weight */}
+                        <div className="sm:col-span-3">
+                          <label className="text-[10px] font-bold text-slate-400 block mb-0.5">
+                            Weight / Qty ({item.unit})
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0.01"
+                            value={item.quantity}
+                            onChange={(e) => handleItemFieldChange(idx, 'quantity', e.target.value)}
+                            className="w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900 text-center focus:bg-white focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        {/* Unit Price */}
+                        <div className="sm:col-span-2">
+                          <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Unit Price (KSh)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.unitPrice}
+                            onChange={(e) => handleItemFieldChange(idx, 'unitPrice', e.target.value)}
+                            className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900 text-right focus:bg-white"
+                          />
+                        </div>
+
+                        {/* Subtotal & Delete */}
+                        <div className="sm:col-span-2 flex items-center justify-between gap-1">
+                          <div className="text-right flex-1">
+                            <span className="text-[10px] font-bold text-slate-400 block">Subtotal</span>
+                            <span className="text-xs font-black text-indigo-700">
+                              KSh {item.subtotal.toLocaleString()}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(idx)}
+                            disabled={editableItems.length <= 1}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 disabled:opacity-20 cursor-pointer"
+                            title="Remove line item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="w-24">
-                        <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Quantity / Kg</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0.1"
-                          value={item.quantity}
-                          onChange={(e) => handleItemFieldChange(idx, 'quantity', e.target.value)}
-                          className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-900 text-center"
-                        />
-                      </div>
-
-                      <div className="w-20">
-                        <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Unit</label>
-                        <input
-                          type="text"
-                          value={item.unit}
-                          onChange={(e) => handleItemFieldChange(idx, 'unit', e.target.value)}
-                          className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 text-center"
-                        />
-                      </div>
-
-                      <div className="w-28">
-                        <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Unit Price (KSh)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.unitPrice}
-                          onChange={(e) => handleItemFieldChange(idx, 'unitPrice', e.target.value)}
-                          className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-900 text-right"
-                        />
-                      </div>
-
-                      <div className="w-24 text-right">
-                        <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Subtotal</label>
-                        <span className="text-xs font-extrabold text-blue-700 block py-1.5">
-                          KSh {item.subtotal.toLocaleString()}
+                      {/* Quick Weight Adjuster Presets */}
+                      <div className="flex flex-wrap items-center gap-1 pt-1.5 border-t border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+                          Quick Weight Scale (Kg):
                         </span>
+                        {[0.5, 1, 2, 3, 5, 8, 10].map(w => (
+                          <button
+                            key={w}
+                            type="button"
+                            onClick={() => handleItemFieldChange(idx, 'quantity', w)}
+                            className="text-[10px] font-bold bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+                          >
+                            {w} kg
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => handleAddWeight(idx, 0.5)}
+                          className="text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md cursor-pointer ml-auto"
+                        >
+                          +0.5 kg
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAddWeight(idx, 1.0)}
+                          className="text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md cursor-pointer"
+                        >
+                          +1.0 kg
+                        </button>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItem(idx)}
-                        disabled={editableItems.length <= 1}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 disabled:opacity-20 cursor-pointer mt-3 sm:mt-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200">
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
                   <button
                     type="button"
                     onClick={handleAddNewItem}
-                    className="text-xs font-bold text-blue-700 hover:text-blue-800 bg-white border border-blue-200 px-3 py-1.5 rounded-xl flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-bold text-indigo-700 hover:text-indigo-800 bg-white border border-indigo-200 hover:bg-indigo-50 px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Add Another Item
+                    <Plus className="w-3.5 h-3.5" /> Add Another Laundry / Garment Item
                   </button>
 
-                  <div className="flex items-center gap-4 text-xs font-medium">
+                  <div className="flex flex-wrap items-center gap-4 text-xs font-medium">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-slate-500">Discount (KSh):</span>
+                      <span className="text-slate-600 font-bold">Discount (KSh):</span>
                       <input
                         type="number"
                         min="0"
                         value={editableDiscount}
                         onChange={(e) => setEditableDiscount(Number(e.target.value) || 0)}
-                        className="w-20 text-xs font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-900 text-right"
+                        className="w-20 text-xs font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-900 text-right focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
 
-                    <div>
-                      <span className="text-slate-500">Calculated Total: </span>
-                      <strong className="text-sm font-black text-slate-900">KSh {editedTotal.toLocaleString()}</strong>
+                    <div className="bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200">
+                      <span className="text-slate-600 text-xs font-medium">Recalculated Total: </span>
+                      <strong className="text-sm font-black text-indigo-900">KSh {editedTotal.toLocaleString()}</strong>
                     </div>
 
                     <button
                       type="button"
                       disabled={isSavingItems}
                       onClick={handleSaveItemsAndPricing}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2 rounded-xl text-xs transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-5 py-2 rounded-xl text-xs transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                     >
-                      {isSavingItems ? "Saving..." : "Save Updated Prices"}
+                      <Check className="w-4 h-4" />
+                      <span>{isSavingItems ? "Saving Prices..." : "Save Updated Prices"}</span>
                     </button>
                   </div>
                 </div>
@@ -1109,7 +1229,7 @@ Thank you for choosing Sparkle Spins!`;
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200/60">
-                    {order.items.length === 0 ? (
+                    {activeOrder.items && activeOrder.items.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="py-6 px-3.5 text-center text-slate-500">
                           <p className="font-bold text-amber-700 mb-1">⚠️ Items pending pickup &amp; weighing</p>
@@ -1119,7 +1239,7 @@ Thank you for choosing Sparkle Spins!`;
                         </td>
                       </tr>
                     ) : (
-                      order.items.map((item, idx) => (
+                      (activeOrder.items || []).map((item, idx) => (
                         <tr key={idx} className="hover:bg-slate-100/40">
                           <td className="py-2.5 px-3.5 font-bold text-slate-900">{item.serviceName}</td>
                           <td className="py-2.5 px-3 text-center text-slate-700 font-medium">{item.quantity} {item.unit}</td>
@@ -1138,13 +1258,13 @@ Thank you for choosing Sparkle Spins!`;
           <div className="bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-200/80">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Price</span>
-              <div className="text-2xl font-black text-slate-900">KSh {order.total.toLocaleString()}</div>
+              <div className="text-2xl font-black text-slate-900">KSh {activeOrder.total.toLocaleString()}</div>
             </div>
 
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Payment Status</span>
-              <div className={`text-xs font-bold ${order.paymentStatus === 'Paid' ? 'text-emerald-600' : 'text-amber-700'}`}>
-                {order.paymentStatus} • Due on Delivery: <strong>KSh {order.balanceDue.toLocaleString()}</strong>
+              <div className={`text-xs font-bold ${activeOrder.paymentStatus === 'Paid' ? 'text-emerald-600' : 'text-amber-700'}`}>
+                {activeOrder.paymentStatus} • Due on Delivery: <strong>KSh {activeOrder.balanceDue.toLocaleString()}</strong>
               </div>
             </div>
 
@@ -1172,7 +1292,7 @@ Thank you for choosing Sparkle Spins!`;
               <button
                 onClick={() => {
                   onClose();
-                  onOpenPaymentModal(order);
+                  onOpenPaymentModal(activeOrder);
                 }}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-xs transition-colors cursor-pointer"
               >

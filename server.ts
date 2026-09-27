@@ -1156,9 +1156,9 @@ app.put("/api/orders/:id", async (req, res) => {
     if (items && Array.isArray(items)) {
       let subtotal = 0;
       order.items = items.map((it: any) => {
-        const qty = Number(it.quantity) || 1;
-        const unitPrice = Number(it.unitPrice) || 0;
-        const sub = unitPrice * qty;
+        const qty = Math.max(0.01, Number(it.quantity) || 0);
+        const unitPrice = Math.max(0, Number(it.unitPrice) || 0);
+        const sub = Math.round(unitPrice * qty);
         subtotal += sub;
         return {
           serviceId: String(it.serviceId || ""),
@@ -1173,10 +1173,10 @@ app.put("/api/orders/:id", async (req, res) => {
       const parsedDiscount = discount !== undefined ? Number(discount) : order.discount;
       order.discount = parsedDiscount;
       order.total = Math.max(0, subtotal - parsedDiscount);
-      order.balanceDue = Math.max(0, order.total - order.amountPaid);
-      if (order.balanceDue === 0 && order.total > 0 && order.amountPaid >= order.total) {
+      order.balanceDue = Math.max(0, order.total - (order.amountPaid || 0));
+      if (order.balanceDue === 0 && order.total > 0 && (order.amountPaid || 0) >= order.total) {
         order.paymentStatus = "Paid";
-      } else if (order.amountPaid > 0) {
+      } else if ((order.amountPaid || 0) > 0) {
         order.paymentStatus = "Partial";
       } else {
         order.paymentStatus = "Unpaid";
@@ -1184,7 +1184,7 @@ app.put("/api/orders/:id", async (req, res) => {
     } else if (discount !== undefined) {
       order.discount = Number(discount) || 0;
       order.total = Math.max(0, order.subtotal - order.discount);
-      order.balanceDue = Math.max(0, order.total - order.amountPaid);
+      order.balanceDue = Math.max(0, order.total - (order.amountPaid || 0));
     }
 
     const previousStatus = order.status;

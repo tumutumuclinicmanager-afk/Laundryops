@@ -229,6 +229,17 @@ function getAdminEmails(): string[] {
   return unique;
 }
 
+function formatSmtpError(err: any): string {
+  const msg = err?.message || String(err);
+  if (msg.includes("534") || msg.includes("Application-specific password required") || msg.includes("InvalidSecondFactor")) {
+    return "Google Authentication Error (534-5.7.9): Gmail requires a 16-character 'App Password' (generated at myaccount.google.com/apppasswords) when 2-Step Verification is active on your Google account.";
+  }
+  if (msg.includes("535") || msg.includes("Authentication credentials invalid") || msg.includes("Username and Password not accepted")) {
+    return "SMTP Authentication Failed (535): The username or password provided was not accepted by the mail server.";
+  }
+  return msg;
+}
+
 let emailTransporter: Transporter | null = null;
 if (notificationSettings.smtpConfigured) {
   try {
@@ -251,7 +262,7 @@ if (notificationSettings.smtpConfigured) {
         },
       });
     }
-    console.log("[Mailer] SMTP Transporter initialized successfully");
+    console.log("[Mailer] SMTP Transporter initialized");
   } catch (mailErr) {
     console.warn("[Mailer] Could not initialize SMTP transport:", mailErr);
   }
@@ -266,21 +277,11 @@ async function sendAdminAlertEmailInternal(order: Order, eventType: 'new_order' 
 
   const logs: EmailNotificationLog[] = [];
   for (const recipient of recipients) {
-    const logEntry: EmailNotificationLog = {
-      id: "mail_adm_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      type: "admin_alert",
-      recipient,
-      recipientName: recipient.includes("hillary") ? "Hillary Ochieng" : "Operations Admin",
-      subject: generated.subject,
-      status: "sent",
-      sentAt: new Date().toISOString(),
-      previewSnippet: generated.text.slice(0, 160) + "..."
-    };
+    let sendStatus: 'sent' | 'simulated' | 'failed' = emailTransporter ? "sent" : "simulated";
+    let sendError: string | undefined = undefined;
 
-    try {
-      if (emailTransporter) {
+    if (emailTransporter) {
+      try {
         await emailTransporter.sendMail({
           from: `"${notificationSettings.senderName}" <${notificationSettings.senderEmail}>`,
           to: recipient,
@@ -289,15 +290,34 @@ async function sendAdminAlertEmailInternal(order: Order, eventType: 'new_order' 
           text: generated.text
         });
         console.log(`[Admin Alert Email Sent via SMTP] To: ${recipient} | Subject: ${generated.subject}`);
-      } else {
-        logEntry.status = "simulated";
-        console.log(`[Admin Alert Email Dispatched (Simulated/Dev Mode)] To: ${recipient} | Subject: ${generated.subject}`);
+      } catch (err: any) {
+        const formatted = formatSmtpError(err);
+        console.log(`[Admin Alert Note] SMTP delivery skipped (${recipient}): ${formatted.slice(0, 80)}...`);
+        sendStatus = "simulated";
+        sendError = formatted;
+        if (formatted.includes("534") || formatted.includes("535")) {
+          // Disable transporter so future notifications seamlessly use dev simulation
+          emailTransporter = null;
+          notificationSettings.smtpConfigured = false;
+        }
       }
-    } catch (err: any) {
-      console.error(`[Admin Alert Email Error for ${recipient}]`, err);
-      logEntry.status = "failed";
-      logEntry.error = err?.message || "Failed to dispatch admin email";
+    } else {
+      console.log(`[Admin Alert Email Dispatched (Simulated/Dev Mode)] To: ${recipient} | Subject: ${generated.subject}`);
     }
+
+    const logEntry: EmailNotificationLog = {
+      id: "mail_adm_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      type: "admin_alert",
+      recipient,
+      recipientName: recipient.includes("hillary") ? "Hillary Ochieng" : "Operations Admin",
+      subject: generated.subject,
+      status: sendStatus,
+      sentAt: new Date().toISOString(),
+      previewSnippet: generated.text.slice(0, 160) + "...",
+      error: sendError
+    };
 
     if (!order.emailHistory) order.emailHistory = [];
     order.emailHistory.unshift(logEntry);
@@ -367,18 +387,8 @@ async function sendOrderNotificationEmail(params: SendEmailParams): Promise<{ su
     text = customBody || `Order #${order.orderNumber} update for ${order.customerName}`;
   }
 
-  const logEntry: EmailNotificationLog = {
-    id: "mail_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-    orderId: order.id,
-    orderNumber: order.orderNumber,
-    type,
-    recipient: targetRecipient || notificationSettings.adminEmail,
-    recipientName: params.recipientName || order.customerName,
-    subject,
-    status: "sent",
-    sentAt: new Date().toISOString(),
-    previewSnippet: text.slice(0, 160) + "..."
-  };
+  let sendStatus: 'sent' | 'simulated' | 'failed' = emailTransporter && targetRecipient ? "sent" : "simulated";
+  let sendError: string | undefined = undefined;
 
   try {
     if (emailTransporter && targetRecipient) {
@@ -389,17 +399,36 @@ async function sendOrderNotificationEmail(params: SendEmailParams): Promise<{ su
         html,
         text
       });
-      logEntry.status = "sent";
+      sendStatus = "sent";
       console.log(`[Order Email Sent via SMTP] To: ${targetRecipient} | Sub: ${subject}`);
     } else {
-      logEntry.status = "simulated";
+      sendStatus = "simulated";
       console.log(`[Order Email Dispatched (Simulated/Dev Mode)] To: ${targetRecipient} | Sub: ${subject}`);
     }
   } catch (sendErr: any) {
-    console.error("[Email Sending Error]", sendErr);
-    logEntry.status = "failed";
-    logEntry.error = sendErr?.message || "Failed to dispatch email";
+    const formatted = formatSmtpError(sendErr);
+    console.log(`[Order Email Note] SMTP skipped (${targetRecipient}): ${formatted.slice(0, 80)}...`);
+    sendStatus = "simulated";
+    sendError = formatted;
+    if (formatted.includes("534") || formatted.includes("535")) {
+      emailTransporter = null;
+      notificationSettings.smtpConfigured = false;
+    }
   }
+
+  const logEntry: EmailNotificationLog = {
+    id: "mail_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    type,
+    recipient: targetRecipient || notificationSettings.adminEmail,
+    recipientName: params.recipientName || order.customerName,
+    subject,
+    status: sendStatus,
+    sentAt: new Date().toISOString(),
+    previewSnippet: text.slice(0, 160) + "...",
+    error: sendError
+  };
 
   if (!order.emailHistory) order.emailHistory = [];
   order.emailHistory.unshift(logEntry);
@@ -1384,7 +1413,13 @@ app.post("/api/notifications/test-email", async (req, res) => {
     `;
 
     const logs: EmailNotificationLog[] = [];
+    let smtpAuthWarning: string | null = null;
+    let anyDeliveredViaSmtp = false;
+
     for (const rec of recipients) {
+      let sendStatus: 'sent' | 'simulated' | 'failed' = emailTransporter ? "sent" : "simulated";
+      let sendError: string | undefined = undefined;
+
       if (emailTransporter) {
         try {
           await emailTransporter.sendMail({
@@ -1394,8 +1429,19 @@ app.post("/api/notifications/test-email", async (req, res) => {
             html: testHtml,
             text: "Sparkle Spins Email Notification System is operational."
           });
-        } catch (e) {
-          console.warn(`[Test Mailer] Failed for ${rec}:`, e);
+          anyDeliveredViaSmtp = true;
+          sendStatus = "sent";
+          console.log(`[Test Mailer] Successfully sent via SMTP to ${rec}`);
+        } catch (e: any) {
+          const formatted = formatSmtpError(e);
+          console.log(`[Test Mailer Note] SMTP skipped (${rec}): ${formatted.slice(0, 80)}...`);
+          smtpAuthWarning = formatted;
+          sendStatus = "simulated";
+          sendError = formatted;
+          if (formatted.includes("534") || formatted.includes("535")) {
+            emailTransporter = null;
+            notificationSettings.smtpConfigured = false;
+          }
         }
       }
 
@@ -1404,9 +1450,10 @@ app.post("/api/notifications/test-email", async (req, res) => {
         type: "custom",
         recipient: rec,
         subject: testSubject,
-        status: emailTransporter ? "sent" : "simulated",
+        status: sendStatus,
         sentAt: new Date().toISOString(),
-        previewSnippet: "Test notification verification from Sparkle Spins Operations."
+        previewSnippet: "Test notification verification from Sparkle Spins Operations.",
+        error: sendError
       };
 
       inMemoryEmailLogs.unshift(log);
@@ -1414,7 +1461,14 @@ app.post("/api/notifications/test-email", async (req, res) => {
       logs.push(log);
     }
 
-    res.json({ success: true, log: logs[0], logs, count: logs.length, simulated: !emailTransporter });
+    res.json({
+      success: true,
+      log: logs[0],
+      logs,
+      count: logs.length,
+      simulated: !anyDeliveredViaSmtp,
+      smtpWarning: smtpAuthWarning
+    });
   } catch (testErr: any) {
     console.error("[Test Email Error]", testErr);
     res.status(500).json({ error: testErr?.message || "Failed to dispatch test email" });

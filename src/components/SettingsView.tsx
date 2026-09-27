@@ -52,7 +52,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Test email state
   const [testEmailAddress, setTestEmailAddress] = useState("wangechigodfrey77@gmail.com");
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
-  const [testEmailResult, setTestEmailResult] = useState<{ success: boolean; msg: string } | null>(null);
+  const [testEmailResult, setTestEmailResult] = useState<{ success: boolean; msg: string; warning?: string | null } | null>(null);
 
   // Firestore Sync status state
   const [syncStatus, setSyncStatus] = useState<any>(null);
@@ -140,8 +140,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         setTestEmailResult({
           success: true,
           msg: data.simulated
-            ? `Test email notification logged & simulated for ${testEmailAddress.trim()}`
-            : `Test email successfully delivered via SMTP to ${testEmailAddress.trim()}`
+            ? `Test email recorded & simulated for ${testEmailAddress.trim()}`
+            : `Test email successfully delivered via SMTP to ${testEmailAddress.trim()}`,
+          warning: data.smtpWarning || null
         });
         fetchNotificationData();
       } else {
@@ -639,12 +640,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
 
               {testEmailResult && (
-                <div className={`p-3 rounded-xl text-xs font-medium ${
-                  testEmailResult.success
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    : 'bg-rose-50 text-rose-800 border border-rose-200'
-                }`}>
-                  {testEmailResult.msg}
+                <div className="space-y-2">
+                  <div className={`p-3 rounded-xl text-xs font-medium ${
+                    testEmailResult.success
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}>
+                    {testEmailResult.msg}
+                  </div>
+                  {testEmailResult.warning && (
+                    <div className="p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-[11px] leading-relaxed space-y-1.5">
+                      <div className="font-bold flex items-center gap-1 text-amber-800">
+                        <span>🔑 Google Account 2FA App Password Notice</span>
+                      </div>
+                      <p>{testEmailResult.warning}</p>
+                      <p className="text-amber-700 font-medium">
+                        To enable real inbox delivery, open <strong>myaccount.google.com/apppasswords</strong>, generate a 16-letter App Password for &apos;Mail&apos;, and set it in your environment. The email is logged below.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

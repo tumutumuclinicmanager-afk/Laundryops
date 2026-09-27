@@ -2,6 +2,7 @@ export interface Customer {
   id: string;
   name: string;
   phone: string;
+  email?: string;
   address: string;
   notes?: string;
   createdAt: string;
@@ -44,12 +45,37 @@ export type OrderStatus =
   | 'Delivered'
   | 'Completed';
 
+export interface EmailNotificationLog {
+  id: string;
+  orderId?: string;
+  orderNumber?: string;
+  type: 'order_confirmation' | 'status_update' | 'invoice' | 'admin_alert' | 'custom';
+  recipient: string;
+  recipientName?: string;
+  subject: string;
+  status: 'sent' | 'simulated' | 'failed';
+  sentAt: string;
+  error?: string;
+  previewSnippet?: string;
+}
+
+export interface NotificationSettings {
+  adminEmail: string;
+  autoSendOrderConfirmation: boolean;
+  autoSendStatusUpdates: boolean;
+  autoSendAdminAlerts: boolean;
+  senderName: string;
+  senderEmail: string;
+  smtpConfigured: boolean;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
   customerId: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   customerAddress: string;
   status: OrderStatus;
   pickupDate: string;
@@ -69,6 +95,9 @@ export interface Order {
   proofOfDelivery?: string;
   invoiceSent?: boolean;
   invoiceSentAt?: string;
+  emailSent?: boolean;
+  emailSentAt?: string;
+  emailHistory?: EmailNotificationLog[];
   createdAt: string;
   updatedAt: string;
 }

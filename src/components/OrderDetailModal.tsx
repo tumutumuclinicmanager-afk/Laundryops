@@ -2,8 +2,14 @@ import React, { useState } from "react";
 import { Order, Driver, OrderStatus, ServiceItem, OrderItem } from "../types";
 import { generateWhatsAppMessage, openWhatsAppChat } from "../utils/whatsapp";
 import {
+  generateOrderConfirmationEmail,
+  generateStatusUpdateEmail,
+  DEFAULT_COMPANY
+} from "../utils/emailTemplates";
+import {
   Truck,
   Phone,
+  Mail,
   MapPin,
   Calendar,
   DollarSign,
@@ -20,7 +26,10 @@ import {
   Check,
   Sparkles,
   ExternalLink,
-  Printer
+  Printer,
+  Inbox,
+  Eye,
+  RefreshCw
 } from "lucide-react";
 
 interface OrderDetailModalProps {
@@ -86,6 +95,22 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const [isSendingSms, setIsSendingSms] = useState<boolean>(false);
   const [smsSuccessMessage, setSmsSuccessMessage] = useState<string | null>(null);
   const [smsError, setSmsError] = useState<string | null>(null);
+
+  // Email Notification Dialog state
+  const [showEmailDialog, setShowEmailDialog] = useState<boolean>(false);
+  const [emailRecipient, setEmailRecipient] = useState<string>(order.customerEmail || "");
+  const [emailType, setEmailType] = useState<'order_confirmation' | 'status_update' | 'invoice' | 'custom'>('order_confirmation');
+  const [emailCustomSubject, setEmailCustomSubject] = useState<string>("");
+  const [emailCustomNote, setEmailCustomNote] = useState<string>("");
+  const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
+  const [emailSuccessMessage, setEmailSuccessMessage] = useState<string | null>(null);
+  const [emailErrorMessage, setEmailErrorMessage] = useState<string | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
+  const [activeOrder, setActiveOrder] = useState<Order>(order);
+
+  // Customer email editing
+  const [isEditingEmail, setIsEditingEmail] = useState<boolean>(false);
+  const [tempEmail, setTempEmail] = useState<string>(order.customerEmail || "");
 
   const assignedDriver = drivers.find(d => d.id === driverId) || (order.driverName ? { name: order.driverName } : null);
 
@@ -192,6 +217,52 @@ Thank you for choosing Sparkle Spins!`;
   const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(invoiceCustomMessage.trim() || defaultInvoiceSmsText)}`;
 
   // Handle general SMS notification
+  // Handle email notification dispatch
+  const handleSendOrderEmail = async () => {
+    if (!emailRecipient.trim()) {
+      setEmailErrorMessage("Please provide a recipient email address.");
+      return;
+    }
+    setIsSendingEmail(true);
+    setEmailErrorMessage(null);
+    setEmailSuccessMessage(null);
+
+    try {
+      const res = await fetch("/api/notifications/send-order-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          type: emailType,
+          recipientEmail: emailRecipient.trim(),
+          customSubject: emailCustomSubject.trim() || undefined,
+          customNote: emailCustomNote.trim() || undefined,
+          sendAdminCopy: true
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to dispatch email notification");
+      }
+
+      if (data.order) {
+        setActiveOrder(data.order);
+      }
+
+      setEmailSuccessMessage(`✨ Order notification email successfully dispatched to ${emailRecipient.trim()}`);
+      setTimeout(() => {
+        setEmailSuccessMessage(null);
+        setShowEmailDialog(false);
+      }, 2500);
+    } catch (err: any) {
+      setEmailErrorMessage(err.message || "Failed to dispatch email notification");
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // General Delivery Update SMS dialog
   const handleSendSms = async () => {
     setIsSendingSms(true);
     setSmsError(null);
@@ -200,23 +271,35 @@ Thank you for choosing Sparkle Spins!`;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customMessage: smsCustomMessage.trim() || defaultFormattedSms
-        })
+          customMessage: smsCustomMessage.trim() || undefined,
+        }),
       });
 
-      if (res.ok) {
-        setSmsSuccessMessage(`Update SMS dispatched to ${order.customerPhone}`);
-        setTimeout(() => {
-          setShowSmsDialog(false);
-          setSmsSuccessMessage(null);
-        }, 2200);
-      } else {
-        setSmsError("Failed to dispatch SMS notification");
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to dispatch SMS");
       }
+
+      setSmsSuccessMessage(`SMS successfully dispatched to ${order.customerPhone}`);
+      setTimeout(() => {
+        setShowSmsDialog(false);
+        setSmsSuccessMessage(null);
+      }, 2200);
     } catch (err: any) {
-      setSmsError(err.message || "Failed to dispatch SMS notification");
+      setSmsError(err.message || "Failed to dispatch status SMS");
     } finally {
       setIsSendingSms(false);
+    }
+  };
+
+  const handleSaveCustomerEmail = async () => {
+    if (onUpdateOrderDetails) {
+      await onUpdateOrderDetails(order.id, {
+        customerEmail: tempEmail.trim()
+      });
+      setActiveOrder(prev => ({ ...prev, customerEmail: tempEmail.trim() }));
+      setEmailRecipient(tempEmail.trim());
+      setIsEditingEmail(false);
     }
   };
 
@@ -321,16 +404,60 @@ Thank you for choosing Sparkle Spins!`;
           <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 border border-slate-200/70">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Customer Details</span>
-              <div className="font-extrabold text-slate-900 text-sm">{order.customerName}</div>
-              <a
-                href={`tel:${order.customerPhone}`}
-                className="text-xs text-blue-600 hover:text-blue-800 font-semibold mt-1 inline-flex items-center gap-1"
-              >
-                <Phone className="w-3 h-3" /> {order.customerPhone}
-              </a>
-              {order.notes && (
+              <div className="font-extrabold text-slate-900 text-sm">{activeOrder.customerName}</div>
+              <div className="flex flex-wrap items-center gap-3 mt-1">
+                <a
+                  href={`tel:${activeOrder.customerPhone}`}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1"
+                >
+                  <Phone className="w-3 h-3" /> {activeOrder.customerPhone}
+                </a>
+
+                {isEditingEmail ? (
+                  <div className="flex items-center gap-1 mt-1 w-full">
+                    <input
+                      type="email"
+                      value={tempEmail}
+                      onChange={(e) => setTempEmail(e.target.value)}
+                      placeholder="customer@email.com"
+                      className="text-xs px-2 py-1 bg-white border border-slate-300 rounded-lg flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveCustomerEmail}
+                      className="text-[10px] bg-blue-600 text-white font-bold px-2 py-1 rounded-lg hover:bg-blue-700 cursor-pointer"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingEmail(false)}
+                      className="text-[10px] text-slate-500 hover:bg-slate-200 px-2 py-1 rounded-lg"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <Mail className="w-3 h-3 text-slate-400" />
+                    <span>{activeOrder.customerEmail || <span className="text-slate-400 italic">No email saved</span>}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempEmail(activeOrder.customerEmail || "");
+                        setIsEditingEmail(true);
+                      }}
+                      className="text-[10px] text-blue-600 hover:underline font-semibold ml-1 cursor-pointer"
+                    >
+                      {activeOrder.customerEmail ? "Edit" : "+ Add"}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {activeOrder.notes && (
                 <p className="text-[11px] text-slate-500 mt-2 bg-white p-2 rounded-lg border border-slate-200">
-                  <strong>Notes:</strong> {order.notes}
+                  <strong>Notes:</strong> {activeOrder.notes}
                 </p>
               )}
             </div>
@@ -338,10 +465,282 @@ Thank you for choosing Sparkle Spins!`;
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Pickup / Delivery Address</span>
               <div className="text-xs text-slate-700 font-medium flex items-start gap-1.5 leading-relaxed">
                 <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
-                <span>{order.customerAddress}</span>
+                <span>{activeOrder.customerAddress}</span>
               </div>
             </div>
           </div>
+
+          {/* Dedicated Order Email Notification Center */}
+          <div className="p-4 sm:p-5 rounded-2xl border-2 border-indigo-200 bg-gradient-to-r from-indigo-50/90 to-blue-50/70 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">
+                    Order Email Notification Hub
+                  </h4>
+                  <p className="text-[11px] text-slate-600">
+                    Send automated or custom confirmation, status updates & receipts to client & ops.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {activeOrder.emailSent ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-300">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    Email Dispatched
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full border border-indigo-200">
+                    <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                    Pending Dispatch
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {activeOrder.emailSentAt && (
+              <div className="text-[11px] text-indigo-900 font-medium bg-white/80 p-2 rounded-xl border border-indigo-100 flex items-center justify-between">
+                <span>✓ Last notification sent on {new Date(activeOrder.emailSentAt).toLocaleString()}</span>
+                {activeOrder.emailHistory && activeOrder.emailHistory.length > 0 && (
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
+                    {activeOrder.emailHistory.length} notification(s) logged
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailType("order_confirmation");
+                  setEmailRecipient(activeOrder.customerEmail || "");
+                  setShowEmailDialog(prev => !prev);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5 text-indigo-200" />
+                <span>{showEmailDialog ? "Close Email Panel" : "Dispatch Email Notification"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailType("status_update");
+                  setEmailRecipient(activeOrder.customerEmail || "");
+                  setShowEmailDialog(true);
+                }}
+                className="bg-white hover:bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Send Status Update Email</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Email Dispatch Dialog */}
+          {showEmailDialog && (
+            <div className="bg-white rounded-2xl border-2 border-indigo-500 p-5 shadow-xl space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                    ✉️
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">Send Order Email Notification</h4>
+                    <p className="text-[11px] text-slate-500">To: {activeOrder.customerName} (#{activeOrder.orderNumber})</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEmailDialog(false)}
+                  className="text-xs text-slate-400 hover:text-slate-600 font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {emailSuccessMessage ? (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span>{emailSuccessMessage}</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Notification Type Selector */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1.5">Select Notification Template</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEmailType('order_confirmation')}
+                        className={`p-2.5 rounded-xl text-left border text-xs font-bold transition-all cursor-pointer ${
+                          emailType === 'order_confirmation'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="text-[10px] opacity-80 uppercase">Template 1</div>
+                        <div>Order Confirmation</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEmailType('status_update')}
+                        className={`p-2.5 rounded-xl text-left border text-xs font-bold transition-all cursor-pointer ${
+                          emailType === 'status_update'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="text-[10px] opacity-80 uppercase">Template 2</div>
+                        <div>Status Update ({status})</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEmailType('invoice')}
+                        className={`p-2.5 rounded-xl text-left border text-xs font-bold transition-all cursor-pointer ${
+                          emailType === 'invoice'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="text-[10px] opacity-80 uppercase">Template 3</div>
+                        <div>Official Invoice</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEmailType('custom')}
+                        className={`p-2.5 rounded-xl text-left border text-xs font-bold transition-all cursor-pointer ${
+                          emailType === 'custom'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="text-[10px] opacity-80 uppercase">Template 4</div>
+                        <div>Custom Notice</div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Recipient Email Input */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Recipient Email Address <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        required
+                        value={emailRecipient}
+                        onChange={(e) => setEmailRecipient(e.target.value)}
+                        placeholder="e.g. customer@domain.com"
+                        className="w-full text-xs font-semibold pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Custom Note or Subject */}
+                  {emailType === 'status_update' && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Optional Status Note / Rider Message</label>
+                      <input
+                        type="text"
+                        value={emailCustomNote}
+                        onChange={(e) => setEmailCustomNote(e.target.value)}
+                        placeholder="e.g. Clothes are freshly folded and rider Samuel is en route."
+                        className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white text-slate-800"
+                      />
+                    </div>
+                  )}
+
+                  {emailType === 'custom' && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Custom Email Message Body</label>
+                      <textarea
+                        rows={4}
+                        value={emailCustomNote}
+                        onChange={(e) => setEmailCustomNote(e.target.value)}
+                        placeholder="Type custom notification to client..."
+                        className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white text-slate-800"
+                      />
+                    </div>
+                  )}
+
+                  {emailErrorMessage && (
+                    <div className="text-xs text-rose-600 flex items-center gap-1.5 p-2 bg-rose-50 rounded-lg">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{emailErrorMessage}</span>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setShowPreviewModal(!showPreviewModal)}
+                      className="px-3 py-2 text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl flex items-center gap-1.5 hover:bg-indigo-100 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      {showPreviewModal ? "Hide Live Template Preview" : "Preview HTML Template"}
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowEmailDialog(false)}
+                        className="px-3 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSendingEmail}
+                        onClick={handleSendOrderEmail}
+                        className="px-4 py-2 text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        {isSendingEmail ? "Dispatching Email..." : "Send Email Notification"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Live HTML Preview Box */}
+                  {showPreviewModal && (
+                    <div className="mt-3 p-4 bg-slate-100 rounded-2xl border border-slate-200 space-y-2">
+                      <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                        <span>Live Email Render Preview</span>
+                        <span className="text-indigo-600 font-mono">Sparkle Spins Template</span>
+                      </div>
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 max-h-64 overflow-y-auto text-xs space-y-2 text-slate-800">
+                        <div className="font-bold text-indigo-700">Subject: {
+                          emailType === 'order_confirmation'
+                            ? `✨ Order Confirmation #${activeOrder.orderNumber} - Sparkle Spins Laundry`
+                            : emailType === 'status_update'
+                            ? `👕 Order Update: #${activeOrder.orderNumber} is now ${status}`
+                            : `🧾 Official Invoice: #${activeOrder.orderNumber}`
+                        }</div>
+                        <div className="p-3 bg-slate-50 rounded-lg text-slate-700 space-y-1">
+                          <p><strong>To:</strong> {emailRecipient || 'customer@example.com'}</p>
+                          <p><strong>Order Ref:</strong> {activeOrder.orderNumber}</p>
+                          <p><strong>Scheduled Pickup:</strong> {activeOrder.pickupDate} ({activeOrder.pickupTimeWindow})</p>
+                          <p><strong>Estimated Delivery:</strong> {activeOrder.deliveryDate} ({activeOrder.deliveryTimeWindow})</p>
+                          <p><strong>Total Due:</strong> KES {activeOrder.total.toLocaleString()} (Pay on delivery)</p>
+                          {emailCustomNote && <p className="text-indigo-600"><strong>Note:</strong> {emailCustomNote}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* PRE-DELIVERY INVOICE BANNER (Crucial feature: payment on delivery, send price before delivery) */}
           <div className={`p-4 sm:p-5 rounded-2xl border-2 transition-all space-y-3 ${

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Order, ServiceItem, Review } from '../types';
 import GhostFibers from './GhostFibers';
-import { Sparkles, Star, ArrowRight, ChevronRight, User, LogIn, MapPin, Phone, CheckCircle2, Truck, Clock, ShieldCheck, HeartHandshake, MessageSquare } from 'lucide-react';
+import { Sparkles, Star, ArrowRight, ChevronRight, User, LogIn, MapPin, Phone, Mail, CheckCircle2, Truck, Clock, ShieldCheck, HeartHandshake, MessageSquare, Send } from 'lucide-react';
 import { GeminiChatbot } from './GeminiChatbot';
 
 interface CustomerLandingPageProps {
@@ -22,6 +22,7 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
   // Order form state
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -67,6 +68,7 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
       const orderPayload = {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
+        customerEmail: customerEmail.trim() || undefined,
         customerAddress: customerAddress.trim(),
         pickupDate,
         pickupTimeWindow,
@@ -230,6 +232,15 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
                     <span className="text-slate-400">Order Reference:</span>
                     <strong className="text-indigo-400 font-mono">{confirmedOrder.orderNumber}</strong>
                   </div>
+                  {confirmedOrder.customerEmail && (
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2 text-indigo-300 bg-indigo-950/40 p-2.5 rounded-lg border border-indigo-500/30">
+                      <span className="flex items-center gap-1.5 text-xs font-medium">
+                        <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                        Confirmation Email:
+                      </span>
+                      <span className="text-xs font-semibold text-white truncate max-w-xs">{confirmedOrder.customerEmail} (Sent)</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                     <span className="text-slate-400">Scheduled Pickup:</span>
                     <strong className="text-white">{confirmedOrder.pickupDate} ({confirmedOrder.pickupTimeWindow})</strong>
@@ -298,6 +309,25 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
                       />
                     </div>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-2">
+                    Email Address (For instant pickup confirmation & receipts)
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      placeholder="e.g. j.karimi@tumutumuhospital.org"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-500"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1 pl-1">
+                    ✨ You will receive an automated order confirmation email with tracking and pricing details.
+                  </p>
                 </div>
 
                 <div>

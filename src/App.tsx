@@ -130,6 +130,7 @@ export default function App() {
         customerId: orderData.customerId || "c_" + Date.now(),
         customerName: orderData.customerName || "Customer",
         customerPhone: orderData.customerPhone || "",
+        customerEmail: orderData.customerEmail,
         customerAddress: orderData.customerAddress || "",
         status: "New",
         pickupDate: orderData.pickupDate || new Date().toISOString().split("T")[0],
@@ -148,6 +149,9 @@ export default function App() {
         notes: orderData.notes || "",
         invoiceSent: false,
         invoiceSentAt: "",
+        emailSent: false,
+        emailSentAt: "",
+        emailHistory: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -240,7 +244,7 @@ export default function App() {
     }
   };
 
-  const handleAddCustomerInline = async (custData: { name: string; phone: string; address: string }) => {
+  const handleAddCustomerInline = async (custData: { name: string; phone: string; address: string; email?: string }) => {
     const res = await fetch("/api/customers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

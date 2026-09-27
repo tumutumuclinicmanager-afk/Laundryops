@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Order } from "../types";
-import { Printer, Download, CheckCircle2, FileText } from "lucide-react";
+import { Printer, Download, CheckCircle2, FileText, Mail, Send, Check } from "lucide-react";
 
 interface InvoiceModalProps {
   order: Order;
@@ -8,15 +8,56 @@ interface InvoiceModalProps {
 }
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) => {
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleEmailInvoice = async () => {
+    let target = order.customerEmail;
+    if (!target) {
+      const input = prompt("Please enter recipient email address:", "");
+      if (!input || !input.trim()) return;
+      target = input.trim();
+    }
+
+    setIsSendingEmail(true);
+    setEmailError(null);
+    setEmailSuccess(null);
+
+    try {
+      const res = await fetch("/api/notifications/send-order-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          type: "invoice",
+          recipientEmail: target,
+          sendAdminCopy: false
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to dispatch invoice email");
+      }
+      setEmailSuccess(`Invoice emailed to ${target}`);
+      setTimeout(() => setEmailSuccess(null), 3000);
+    } catch (e: any) {
+      setEmailError(e.message || "Failed to dispatch invoice email");
+      setTimeout(() => setEmailError(null), 4000);
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
       <div className="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl my-8 relative">
         {/* Top actions bar (hidden during print) */}
-        <div className="flex items-center justify-between pb-6 border-b border-slate-100 print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-slate-100 print:hidden">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
               🧺
@@ -28,19 +69,39 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={handleEmailInvoice}
+              disabled={isSendingEmail}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+            >
+              {emailSuccess ? <Check className="w-4 h-4 text-emerald-600" /> : <Mail className="w-4 h-4" />}
+              {isSendingEmail ? "Dispatching..." : emailSuccess ? "Emailed!" : "Email Invoice"}
+            </button>
+            <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-medium transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-medium transition-all shadow-xs cursor-pointer"
             >
               <Printer className="w-4 h-4" /> Print / PDF
             </button>
             <button
               onClick={onClose}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium"
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium cursor-pointer"
             >
               Close
             </button>
           </div>
         </div>
+
+        {emailSuccess && (
+          <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-2 print:hidden">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{emailSuccess}</span>
+          </div>
+        )}
+        {emailError && (
+          <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-xl print:hidden">
+            <span>{emailError}</span>
+          </div>
+        )}
 
         {/* Printable Invoice Body */}
         <div className="mt-6 space-y-6 text-slate-800">

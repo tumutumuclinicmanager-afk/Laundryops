@@ -2,10 +2,27 @@ import "dotenv/config";
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { initializeApp, getApps, App } from "firebase-admin/app";
-import { getFirestore, Firestore } from "firebase-admin/firestore";
+import nodemailer, { type Transporter } from "nodemailer";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  writeBatch,
+  type Firestore
+} from "firebase/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { getExpertLaundryResponse } from "./src/utils/laundryKnowledge";
+import {
+  generateOrderConfirmationEmail,
+  generateStatusUpdateEmail,
+  generateAdminAlertEmail,
+  DEFAULT_COMPANY
+} from "./src/utils/emailTemplates";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || "",
@@ -18,30 +35,26 @@ const ai = new GoogleGenAI({
 
 let firestore: Firestore | null = null;
 try {
-  let projectId = "balmy-parity-mdw77";
-  let databaseId = "ai-studio-laundryopsmanage-1920ac0b-bf06-4683-97e5-3104d6cbdfc6";
-
   const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  let firebaseConfig: any = {
+    projectId: "balmy-parity-mdw77",
+    firestoreDatabaseId: "ai-studio-laundryopsmanage-1920ac0b-bf06-4683-97e5-3104d6cbdfc6"
+  };
+
   if (fs.existsSync(configPath)) {
     try {
-      const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      if (configData.projectId) projectId = configData.projectId;
-      if (configData.firestoreDatabaseId) databaseId = configData.firestoreDatabaseId;
+      firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     } catch (cfgErr) {
       console.warn("Could not read firebase-applet-config.json:", cfgErr);
     }
   }
 
-  const appInstance: App = getApps().length === 0 ? initializeApp({ projectId }) : getApps()[0];
+  const appInstance = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  const databaseId = firebaseConfig.firestoreDatabaseId || "(default)";
   firestore = getFirestore(appInstance, databaseId);
-  try {
-    firestore.settings({ ignoreUndefinedProperties: true });
-    console.log(`[Firestore] Initialized for databaseId: ${databaseId} with ignoreUndefinedProperties=true`);
-  } catch (settingErr) {
-    console.warn("[Firestore] Could not apply settings:", settingErr);
-  }
+  console.log(`[Firestore] Initialized client SDK for databaseId: ${databaseId}`);
 } catch (e: any) {
-  console.warn("[Firestore] Admin initialization note:", e?.message || e);
+  console.warn("[Firestore] Initialization note:", e?.message || e);
 }
 
 // Deep recursive cleaner to ensure no undefined fields ever reach Firestore documents
@@ -64,22 +77,24 @@ function cleanForFirestore(obj: any): any {
   return obj;
 }
 
-async function saveToFirestore(collection: string, id: string, data: any): Promise<void> {
+async function saveToFirestore(collectionName: string, id: string, data: any): Promise<void> {
   if (!firestore) return;
   try {
     const cleaned = cleanForFirestore(data);
-    await firestore.collection(collection).doc(id).set(cleaned);
-  } catch (err) {
-    console.warn(`[Firestore] Failed to save to ${collection}/${id}:`, err);
+    const docRef = doc(firestore, collectionName, id);
+    await setDoc(docRef, cleaned, { merge: true });
+  } catch (err: any) {
+    console.warn(`[Firestore] Note on saving ${collectionName}/${id}:`, err?.message || err);
   }
 }
 
-async function deleteFromFirestore(collection: string, id: string): Promise<void> {
+async function deleteFromFirestore(collectionName: string, id: string): Promise<void> {
   if (!firestore) return;
   try {
-    await firestore.collection(collection).doc(id).delete();
-  } catch (err) {
-    console.warn(`[Firestore] Failed to delete from ${collection}/${id}:`, err);
+    const docRef = doc(firestore, collectionName, id);
+    await deleteDoc(docRef);
+  } catch (err: any) {
+    console.warn(`[Firestore] Note on deleting ${collectionName}/${id}:`, err?.message || err);
   }
 }
 
@@ -97,6 +112,7 @@ interface Customer {
   id: string;
   name: string;
   phone: string;
+  email?: string;
   address: string;
   notes?: string;
   createdAt: string;
@@ -129,12 +145,37 @@ interface OrderItem {
   subtotal: number;
 }
 
+interface EmailNotificationLog {
+  id: string;
+  orderId?: string;
+  orderNumber?: string;
+  type: 'order_confirmation' | 'status_update' | 'invoice' | 'admin_alert' | 'custom';
+  recipient: string;
+  recipientName?: string;
+  subject: string;
+  status: 'sent' | 'simulated' | 'failed';
+  sentAt: string;
+  error?: string;
+  previewSnippet?: string;
+}
+
+interface NotificationSettings {
+  adminEmail: string;
+  autoSendOrderConfirmation: boolean;
+  autoSendStatusUpdates: boolean;
+  autoSendAdminAlerts: boolean;
+  senderName: string;
+  senderEmail: string;
+  smtpConfigured: boolean;
+}
+
 interface Order {
   id: string;
   orderNumber: string;
   customerId: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   customerAddress: string;
   status: 'New' | 'Pickup Scheduled' | 'Picked Up' | 'In Process' | 'Ready for Delivery' | 'Out for Delivery' | 'Delivered' | 'Completed';
   pickupDate: string;
@@ -154,8 +195,227 @@ interface Order {
   proofOfDelivery?: string;
   invoiceSent?: boolean;
   invoiceSentAt?: string;
+  emailSent?: boolean;
+  emailSentAt?: string;
+  emailHistory?: EmailNotificationLog[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Mailer & Notification state
+const notificationSettings: NotificationSettings = {
+  adminEmail: process.env.ADMIN_NOTIFICATION_EMAIL || "wangechigodfrey77@gmail.com, hillaryochieng002@gmail.com",
+  autoSendOrderConfirmation: true,
+  autoSendStatusUpdates: true,
+  autoSendAdminAlerts: true,
+  senderName: "Sparkle Spins Laundry Operations",
+  senderEmail: process.env.EMAIL_FROM || "notifications@sparklespins.co.ke",
+  smtpConfigured: Boolean(
+    (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) ||
+    (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD)
+  )
+};
+
+function getAdminEmails(): string[] {
+  const raw = notificationSettings.adminEmail || "";
+  const parts = raw.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
+  const unique = Array.from(new Set(parts));
+  if (!unique.includes("hillaryochieng002@gmail.com")) {
+    unique.push("hillaryochieng002@gmail.com");
+  }
+  if (!unique.includes("wangechigodfrey77@gmail.com") && parts.length === 0) {
+    unique.unshift("wangechigodfrey77@gmail.com");
+  }
+  return unique;
+}
+
+let emailTransporter: Transporter | null = null;
+if (notificationSettings.smtpConfigured) {
+  try {
+    if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+      emailTransporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.GMAIL_USER,
+          pass: process.env.GMAIL_APP_PASSWORD,
+        },
+      });
+    } else {
+      emailTransporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: process.env.SMTP_SECURE === "true" || process.env.SMTP_PORT === "465",
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+    }
+    console.log("[Mailer] SMTP Transporter initialized successfully");
+  } catch (mailErr) {
+    console.warn("[Mailer] Could not initialize SMTP transport:", mailErr);
+  }
+}
+
+const inMemoryEmailLogs: EmailNotificationLog[] = [];
+
+async function sendAdminAlertEmailInternal(order: Order, eventType: 'new_order' | 'status_change' | 'payment') {
+  const recipients = getAdminEmails();
+  if (recipients.length === 0) return null;
+  const generated = generateAdminAlertEmail(order, eventType);
+
+  const logs: EmailNotificationLog[] = [];
+  for (const recipient of recipients) {
+    const logEntry: EmailNotificationLog = {
+      id: "mail_adm_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      type: "admin_alert",
+      recipient,
+      recipientName: recipient.includes("hillary") ? "Hillary Ochieng" : "Operations Admin",
+      subject: generated.subject,
+      status: "sent",
+      sentAt: new Date().toISOString(),
+      previewSnippet: generated.text.slice(0, 160) + "..."
+    };
+
+    try {
+      if (emailTransporter) {
+        await emailTransporter.sendMail({
+          from: `"${notificationSettings.senderName}" <${notificationSettings.senderEmail}>`,
+          to: recipient,
+          subject: generated.subject,
+          html: generated.html,
+          text: generated.text
+        });
+        console.log(`[Admin Alert Email Sent via SMTP] To: ${recipient} | Subject: ${generated.subject}`);
+      } else {
+        logEntry.status = "simulated";
+        console.log(`[Admin Alert Email Dispatched (Simulated/Dev Mode)] To: ${recipient} | Subject: ${generated.subject}`);
+      }
+    } catch (err: any) {
+      console.error(`[Admin Alert Email Error for ${recipient}]`, err);
+      logEntry.status = "failed";
+      logEntry.error = err?.message || "Failed to dispatch admin email";
+    }
+
+    if (!order.emailHistory) order.emailHistory = [];
+    order.emailHistory.unshift(logEntry);
+    inMemoryEmailLogs.unshift(logEntry);
+    saveToFirestore("notification_logs", logEntry.id, logEntry);
+    logs.push(logEntry);
+  }
+
+  order.emailSent = true;
+  order.emailSentAt = logs[0]?.sentAt || new Date().toISOString();
+  order.updatedAt = new Date().toISOString();
+
+  saveToFirestore("orders", order.id, order);
+  return logs[0] || null;
+}
+
+interface SendEmailParams {
+  order: Order;
+  type: 'order_confirmation' | 'status_update' | 'invoice' | 'admin_alert' | 'custom';
+  recipientEmail?: string;
+  recipientName?: string;
+  customSubject?: string;
+  customBody?: string;
+  customNote?: string;
+  sendAdminCopy?: boolean;
+}
+
+async function sendOrderNotificationEmail(params: SendEmailParams): Promise<{ success: boolean; log?: EmailNotificationLog; error?: string }> {
+  const { order, type, customSubject, customBody, customNote, sendAdminCopy = true } = params;
+  const targetRecipient = params.recipientEmail || order.customerEmail;
+
+  if (!targetRecipient && type !== 'admin_alert') {
+    if (sendAdminCopy && notificationSettings.autoSendAdminAlerts && notificationSettings.adminEmail) {
+      await sendAdminAlertEmailInternal(order, 'new_order');
+    }
+    return { success: false, error: "No customer email address on file" };
+  }
+
+  let subject = "";
+  let html = "";
+  let text = "";
+
+  if (type === 'order_confirmation') {
+    const gen = generateOrderConfirmationEmail(order, DEFAULT_COMPANY);
+    subject = customSubject || gen.subject;
+    html = gen.html;
+    text = gen.text;
+  } else if (type === 'status_update') {
+    const gen = generateStatusUpdateEmail(order, order.status, customNote, DEFAULT_COMPANY);
+    subject = customSubject || gen.subject;
+    html = gen.html;
+    text = gen.text;
+  } else if (type === 'invoice') {
+    const gen = generateOrderConfirmationEmail(order, DEFAULT_COMPANY);
+    subject = customSubject || `🧾 Official Invoice: #${order.orderNumber} - Sparkle Spins Laundry`;
+    html = gen.html;
+    text = gen.text;
+  } else if (type === 'custom') {
+    subject = customSubject || `Sparkle Spins Order #${order.orderNumber} Update`;
+    html = `<div style="font-family: sans-serif; padding: 24px; color: #1e293b;">
+      <h2 style="color: #4338ca;">Sparkle Spins Laundry Operations</h2>
+      <p style="font-size: 15px; line-height: 1.6;">${customBody || 'Order Notification'}</p>
+      <div style="margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
+        Order #${order.orderNumber} • ${order.customerName}
+      </div>
+    </div>`;
+    text = customBody || `Order #${order.orderNumber} update for ${order.customerName}`;
+  }
+
+  const logEntry: EmailNotificationLog = {
+    id: "mail_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    type,
+    recipient: targetRecipient || notificationSettings.adminEmail,
+    recipientName: params.recipientName || order.customerName,
+    subject,
+    status: "sent",
+    sentAt: new Date().toISOString(),
+    previewSnippet: text.slice(0, 160) + "..."
+  };
+
+  try {
+    if (emailTransporter && targetRecipient) {
+      await emailTransporter.sendMail({
+        from: `"${notificationSettings.senderName}" <${notificationSettings.senderEmail}>`,
+        to: targetRecipient,
+        subject,
+        html,
+        text
+      });
+      logEntry.status = "sent";
+      console.log(`[Order Email Sent via SMTP] To: ${targetRecipient} | Sub: ${subject}`);
+    } else {
+      logEntry.status = "simulated";
+      console.log(`[Order Email Dispatched (Simulated/Dev Mode)] To: ${targetRecipient} | Sub: ${subject}`);
+    }
+  } catch (sendErr: any) {
+    console.error("[Email Sending Error]", sendErr);
+    logEntry.status = "failed";
+    logEntry.error = sendErr?.message || "Failed to dispatch email";
+  }
+
+  if (!order.emailHistory) order.emailHistory = [];
+  order.emailHistory.unshift(logEntry);
+  order.emailSent = true;
+  order.emailSentAt = logEntry.sentAt;
+  order.updatedAt = new Date().toISOString();
+
+  inMemoryEmailLogs.unshift(logEntry);
+  saveToFirestore("notification_logs", logEntry.id, logEntry);
+  saveToFirestore("orders", order.id, order);
+
+  if (sendAdminCopy && notificationSettings.autoSendAdminAlerts && notificationSettings.adminEmail && targetRecipient !== notificationSettings.adminEmail) {
+    await sendAdminAlertEmailInternal(order, type === 'order_confirmation' ? 'new_order' : 'status_change');
+  }
+
+  return { success: logEntry.status !== "failed", log: logEntry };
 }
 
 interface Payment {
@@ -368,25 +628,119 @@ let inMemoryReviews: Review[] = [...initialReviews];
 async function getCollection<T extends { id: string }>(name: string, fallbackList: T[]): Promise<T[]> {
   if (!firestore) return fallbackList;
   try {
-    const snap = await firestore.collection(name).get();
+    const colRef = collection(firestore, name);
+    const snap = await getDocs(colRef);
     if (snap.empty) {
       try {
-        const batch = firestore.batch();
+        const batch = writeBatch(firestore);
         for (const item of fallbackList) {
-          const ref = firestore.collection(name).doc(item.id);
-          batch.set(ref, cleanForFirestore(item));
+          const itemRef = doc(firestore, name, item.id);
+          batch.set(itemRef, cleanForFirestore(item));
         }
         await batch.commit();
-      } catch (seedErr) {
-        // Continue with fallback if seeding fails
+        console.log(`[Firestore] Initialized collection '${name}' with ${fallbackList.length} items.`);
+      } catch (seedErr: any) {
+        console.warn(`[Firestore] Collection seed note for '${name}':`, seedErr?.message || seedErr);
       }
       return fallbackList;
     }
-    return snap.docs.map(doc => doc.data() as T);
-  } catch {
+    const items = snap.docs.map(d => d.data() as T);
+    return items;
+  } catch (readErr: any) {
+    console.warn(`[Firestore] Read note for '${name}', using memory cache:`, readErr?.message || readErr);
     return fallbackList;
   }
 }
+
+// Initial direct preloading from Firestore
+async function preloadAndSyncFirestore() {
+  if (!firestore) {
+    console.log("[Firestore] Running with cached in-memory state");
+    return;
+  }
+  try {
+    console.log("[Firestore] Starting full database preloading & sync...");
+    const [custs, drivs, servs, ords, pays, revs, logs] = await Promise.all([
+      getCollection<Customer>("customers", initialCustomers),
+      getCollection<Driver>("drivers", initialDrivers),
+      getCollection<ServiceItem>("services", initialServices),
+      getCollection<Order>("orders", initialOrders),
+      getCollection<Payment>("payments", initialPayments),
+      getCollection<Review>("reviews", initialReviews),
+      getCollection<EmailNotificationLog>("notification_logs", inMemoryEmailLogs)
+    ]);
+
+    inMemoryCustomers = custs;
+    inMemoryDrivers = drivs;
+    inMemoryServices = servs;
+    inMemoryOrders = ords;
+    inMemoryPayments = pays;
+    inMemoryReviews = revs;
+    inMemoryEmailLogs.length = 0;
+    inMemoryEmailLogs.push(...logs);
+
+    // Also load settings document if present
+    try {
+      const settingsRef = doc(firestore, "settings", "notifications");
+      const settingsDoc = await getDoc(settingsRef);
+      if (settingsDoc.exists()) {
+        const data = settingsDoc.data() as NotificationSettings;
+        if (data) {
+          Object.assign(notificationSettings, data);
+        }
+      } else {
+        await setDoc(settingsRef, cleanForFirestore(notificationSettings));
+      }
+    } catch (setErr: any) {
+      console.warn("[Firestore] Settings load note:", setErr?.message || setErr);
+    }
+
+    console.log(`[Firestore Sync Active] Synced -> ${ords.length} Orders, ${custs.length} Customers, ${drivs.length} Drivers, ${servs.length} Services, ${pays.length} Payments, ${revs.length} Reviews`);
+  } catch (syncErr: any) {
+    console.warn("[Firestore] Sync initialization note:", syncErr?.message || syncErr);
+  }
+}
+
+// Run preload asynchronously
+preloadAndSyncFirestore();
+
+// Database Sync Health & Status endpoint
+app.get("/api/sync/status", async (req, res) => {
+  let isConnected = false;
+  let orderCount = inMemoryOrders.length;
+  let customerCount = inMemoryCustomers.length;
+  let driverCount = inMemoryDrivers.length;
+  let serviceCount = inMemoryServices.length;
+  let paymentCount = inMemoryPayments.length;
+  let reviewCount = inMemoryReviews.length;
+  let logCount = inMemoryEmailLogs.length;
+
+  if (firestore) {
+    try {
+      const orderSnap = await getDocs(collection(firestore, "orders"));
+      isConnected = true;
+      orderCount = orderSnap.size;
+    } catch (e: any) {
+      isConnected = false;
+    }
+  }
+
+  res.json({
+    connected: isConnected,
+    databaseId: "ai-studio-laundryopsmanage-1920ac0b-bf06-4683-97e5-3104d6cbdfc6",
+    projectId: "balmy-parity-mdw77",
+    counts: {
+      orders: orderCount,
+      customers: customerCount,
+      drivers: driverCount,
+      services: serviceCount,
+      payments: paymentCount,
+      reviews: reviewCount,
+      notificationLogs: logCount
+    },
+    lastSyncedAt: new Date().toISOString()
+  });
+});
 
 // Seed endpoint / reset
 app.post("/api/seed", async (req, res) => {
@@ -400,16 +754,16 @@ app.post("/api/seed", async (req, res) => {
 
     if (firestore) {
       try {
-        const batch = firestore.batch();
-        for (const c of initialCustomers) batch.set(firestore.collection("customers").doc(c.id), cleanForFirestore(c));
-        for (const d of initialDrivers) batch.set(firestore.collection("drivers").doc(d.id), cleanForFirestore(d));
-        for (const s of initialServices) batch.set(firestore.collection("services").doc(s.id), cleanForFirestore(s));
-        for (const o of initialOrders) batch.set(firestore.collection("orders").doc(o.id), cleanForFirestore(o));
-        for (const p of initialPayments) batch.set(firestore.collection("payments").doc(p.id), cleanForFirestore(p));
-        for (const r of initialReviews) batch.set(firestore.collection("reviews").doc(r.id), cleanForFirestore(r));
+        const batch = writeBatch(firestore);
+        for (const c of initialCustomers) batch.set(doc(firestore, "customers", c.id), cleanForFirestore(c));
+        for (const d of initialDrivers) batch.set(doc(firestore, "drivers", d.id), cleanForFirestore(d));
+        for (const s of initialServices) batch.set(doc(firestore, "services", s.id), cleanForFirestore(s));
+        for (const o of initialOrders) batch.set(doc(firestore, "orders", o.id), cleanForFirestore(o));
+        for (const p of initialPayments) batch.set(doc(firestore, "payments", p.id), cleanForFirestore(p));
+        for (const r of initialReviews) batch.set(doc(firestore, "reviews", r.id), cleanForFirestore(r));
         await batch.commit();
-      } catch (fsErr) {
-        console.warn("[Firestore] Batch seed note:", fsErr);
+      } catch (fsErr: any) {
+        console.warn("[Firestore] Batch seed note:", fsErr?.message || fsErr);
       }
     }
     res.json({ success: true, message: "Database reset to seed successfully" });
@@ -589,6 +943,7 @@ app.post("/api/orders", async (req, res) => {
       customerId,
       customerName,
       customerPhone,
+      customerEmail,
       customerAddress,
       pickupDate,
       pickupTimeWindow,
@@ -597,7 +952,8 @@ app.post("/api/orders", async (req, res) => {
       driverId,
       items,
       discount = 0,
-      notes
+      notes,
+      sendEmailConfirmation = true
     } = req.body;
 
     const customers = await getCollection<Customer>("customers", inMemoryCustomers);
@@ -605,6 +961,10 @@ app.post("/api/orders", async (req, res) => {
 
     if (customerId) {
       customer = customers.find(c => c.id === customerId);
+      if (customer && customerEmail && !customer.email) {
+        customer.email = String(customerEmail).trim();
+        saveToFirestore("customers", customer.id, customer);
+      }
     } else if (customerName && customerPhone) {
       const cleanPhone = String(customerPhone).replace(/\D/g, "");
       customer = customers.find(c => c.phone.replace(/\D/g, "") === cleanPhone);
@@ -613,14 +973,20 @@ app.post("/api/orders", async (req, res) => {
           id: "c_" + Date.now(),
           name: String(customerName).trim(),
           phone: String(customerPhone).trim(),
+          email: customerEmail ? String(customerEmail).trim() : undefined,
           address: customerAddress ? String(customerAddress).trim() : "Address provided on booking",
           notes: notes ? `Guest Booking: ${String(notes).trim()}` : "Booked via customer portal",
           createdAt: new Date().toISOString()
         };
         inMemoryCustomers.unshift(customer);
         saveToFirestore("customers", customer.id, customer);
-      } else if (customerAddress && String(customerAddress).trim()) {
-        customer.address = String(customerAddress).trim();
+      } else {
+        if (customerAddress && String(customerAddress).trim()) {
+          customer.address = String(customerAddress).trim();
+        }
+        if (customerEmail && String(customerEmail).trim()) {
+          customer.email = String(customerEmail).trim();
+        }
         saveToFirestore("customers", customer.id, customer);
       }
     }
@@ -632,6 +998,7 @@ app.post("/api/orders", async (req, res) => {
         id: "c_" + Date.now(),
         name: fallbackName,
         phone: fallbackPhone,
+        email: customerEmail ? String(customerEmail).trim() : undefined,
         address: customerAddress ? String(customerAddress).trim() : "Pickup address pending",
         notes: notes ? `Booking: ${String(notes).trim()}` : "Booked via customer portal",
         createdAt: new Date().toISOString()
@@ -671,12 +1038,15 @@ app.post("/api/orders", async (req, res) => {
       if (d) driverName = d.name;
     }
 
+    const targetEmail = customerEmail ? String(customerEmail).trim() : (customer.email || undefined);
+
     const newOrder: Order = {
       id: "ord_" + Date.now(),
       orderNumber: orderNum,
       customerId: customer.id,
       customerName: customer.name,
       customerPhone: customer.phone,
+      customerEmail: targetEmail,
       customerAddress: customer.address,
       status: "New",
       pickupDate: pickupDate || new Date().toISOString().split("T")[0],
@@ -695,12 +1065,38 @@ app.post("/api/orders", async (req, res) => {
       notes: notes ? String(notes).trim() : "",
       invoiceSent: false,
       invoiceSentAt: "",
+      emailSent: false,
+      emailSentAt: "",
+      emailHistory: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
     inMemoryOrders.unshift(newOrder);
-    saveToFirestore("orders", newOrder.id, newOrder);
+    await saveToFirestore("orders", newOrder.id, newOrder);
+
+    // 1. Always automatically trigger instant Admin Order Notification Email
+    if (notificationSettings.autoSendAdminAlerts && notificationSettings.adminEmail) {
+      try {
+        await sendAdminAlertEmailInternal(newOrder, 'new_order');
+      } catch (adminMailErr) {
+        console.warn("[Admin Alert Email Notice]", adminMailErr);
+      }
+    }
+
+    // 2. Also trigger Customer Order Confirmation Email if customer email is provided
+    if (newOrder.customerEmail && sendEmailConfirmation && notificationSettings.autoSendOrderConfirmation) {
+      try {
+        await sendOrderNotificationEmail({
+          order: newOrder,
+          type: "order_confirmation",
+          sendAdminCopy: false // Admin already notified in step 1
+        });
+      } catch (custMailErr) {
+        console.warn("[Customer Confirmation Email Notice]", custMailErr);
+      }
+    }
+
     res.status(201).json(newOrder);
   } catch (orderErr: any) {
     console.error("[Orders] Creation error:", orderErr);
@@ -762,6 +1158,7 @@ app.put("/api/orders/:id", async (req, res) => {
       order.balanceDue = Math.max(0, order.total - order.amountPaid);
     }
 
+    const previousStatus = order.status;
     if (status) order.status = status;
     if (deliveryDate) order.deliveryDate = deliveryDate;
     if (deliveryTimeWindow) order.deliveryTimeWindow = deliveryTimeWindow;
@@ -794,6 +1191,15 @@ app.put("/api/orders/:id", async (req, res) => {
       inMemoryOrders[memIdx] = { ...order };
     }
 
+    // Auto-send status update email if status changed
+    if (status && status !== previousStatus && notificationSettings.autoSendStatusUpdates && (order.customerEmail || notificationSettings.autoSendAdminAlerts)) {
+      sendOrderNotificationEmail({
+        order,
+        type: "status_update",
+        sendAdminCopy: false
+      }).catch(err => console.warn("[Status Email Notice]", err));
+    }
+
     res.json(order);
   } catch (err: any) {
     console.error("[Orders] Update error:", err);
@@ -808,6 +1214,7 @@ app.patch("/api/orders/:id/status", async (req, res) => {
     const order = orders.find(o => o.id === req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
+    const previousStatus = order.status;
     if (status) order.status = status;
     if (proofOfDelivery !== undefined) order.proofOfDelivery = proofOfDelivery;
     if (driverId !== undefined) {
@@ -823,6 +1230,16 @@ app.patch("/api/orders/:id/status", async (req, res) => {
     order.updatedAt = new Date().toISOString();
 
     await saveToFirestore("orders", order.id, order);
+
+    // Auto-send status update email if status changed
+    if (status && status !== previousStatus && notificationSettings.autoSendStatusUpdates && (order.customerEmail || notificationSettings.autoSendAdminAlerts)) {
+      sendOrderNotificationEmail({
+        order,
+        type: "status_update",
+        sendAdminCopy: false
+      }).catch(err => console.warn("[Status Email Notice]", err));
+    }
+
     res.json(order);
   } catch (patchErr: any) {
     console.error("[Orders] Status patch error:", patchErr);
@@ -830,14 +1247,14 @@ app.patch("/api/orders/:id/status", async (req, res) => {
   }
 });
 
-// Admin sends the pre-delivery invoice to the client
+// Admin sends the pre-delivery invoice to the client (SMS + Email)
 app.post("/api/orders/:id/send-invoice", async (req, res) => {
   try {
     const orders = await getCollection<Order>("orders", inMemoryOrders);
     const order = orders.find(o => o.id === req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
-    const { customMessage } = req.body;
+    const { customMessage, recipientEmail } = req.body;
     order.invoiceSent = true;
     order.invoiceSentAt = new Date().toISOString();
     order.updatedAt = new Date().toISOString();
@@ -850,15 +1267,157 @@ app.post("/api/orders/:id/send-invoice", async (req, res) => {
     await saveToFirestore("orders", order.id, order);
     console.log(`[Sparkle Spins Pre-Delivery Invoice SMS] To ${order.customerPhone}: "${messageToSend}"`);
 
+    // Dispatch invoice email if customer email exists or recipientEmail passed
+    let emailResult = null;
+    const targetEmail = recipientEmail || order.customerEmail;
+    if (targetEmail) {
+      emailResult = await sendOrderNotificationEmail({
+        order,
+        type: "invoice",
+        recipientEmail: targetEmail,
+        sendAdminCopy: false
+      }).catch(e => {
+        console.warn("[Invoice Email Warning]", e);
+        return { success: false, error: e?.message };
+      });
+    }
+
     res.json({
       success: true,
       order,
       invoiceMessage: messageToSend,
-      sentAt: order.invoiceSentAt
+      sentAt: order.invoiceSentAt,
+      emailSent: Boolean(emailResult?.success)
     });
   } catch (err: any) {
     console.error("[Invoice] Dispatch error:", err);
     res.status(500).json({ error: err.message || "Failed to dispatch invoice" });
+  }
+});
+
+// Dedicated Email Notification Endpoints
+app.post("/api/notifications/send-order-email", async (req, res) => {
+  try {
+    const { orderId, type = "order_confirmation", recipientEmail, recipientName, customSubject, customBody, customNote, sendAdminCopy = true } = req.body;
+    
+    if (!orderId) {
+      return res.status(400).json({ error: "orderId is required" });
+    }
+
+    const orders = await getCollection<Order>("orders", inMemoryOrders);
+    const order = orders.find(o => o.id === orderId);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const result = await sendOrderNotificationEmail({
+      order,
+      type,
+      recipientEmail,
+      recipientName,
+      customSubject,
+      customBody,
+      customNote,
+      sendAdminCopy
+    });
+
+    res.json({
+      success: result.success,
+      log: result.log,
+      order,
+      error: result.error
+    });
+  } catch (err: any) {
+    console.error("[Send Order Email Error]", err);
+    res.status(500).json({ error: err?.message || "Failed to send order email" });
+  }
+});
+
+app.get("/api/notifications/settings", (req, res) => {
+  res.json({
+    ...notificationSettings,
+    smtpConfigured: Boolean(
+      (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) ||
+      (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD)
+    )
+  });
+});
+
+app.post("/api/notifications/settings", (req, res) => {
+  const { adminEmail, autoSendOrderConfirmation, autoSendStatusUpdates, autoSendAdminAlerts, senderName, senderEmail } = req.body;
+  if (adminEmail !== undefined) notificationSettings.adminEmail = String(adminEmail).trim();
+  if (autoSendOrderConfirmation !== undefined) notificationSettings.autoSendOrderConfirmation = Boolean(autoSendOrderConfirmation);
+  if (autoSendStatusUpdates !== undefined) notificationSettings.autoSendStatusUpdates = Boolean(autoSendStatusUpdates);
+  if (autoSendAdminAlerts !== undefined) notificationSettings.autoSendAdminAlerts = Boolean(autoSendAdminAlerts);
+  if (senderName !== undefined) notificationSettings.senderName = String(senderName).trim();
+  if (senderEmail !== undefined) notificationSettings.senderEmail = String(senderEmail).trim();
+
+  saveToFirestore("settings", "notifications", notificationSettings);
+  res.json({ success: true, settings: notificationSettings });
+});
+
+app.get("/api/notifications/logs", async (req, res) => {
+  const logs = await getCollection<EmailNotificationLog>("notification_logs", inMemoryEmailLogs);
+  res.json(logs.sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()));
+});
+
+app.post("/api/notifications/test-email", async (req, res) => {
+  try {
+    const { targetEmail } = req.body;
+    const recipientRaw = targetEmail || notificationSettings.adminEmail;
+    if (!recipientRaw) {
+      return res.status(400).json({ error: "Target email address is required" });
+    }
+
+    const recipients = recipientRaw.split(/[,;\s]+/).map((s: string) => s.trim()).filter(Boolean);
+    if (recipients.length === 0) {
+      return res.status(400).json({ error: "No valid recipient email address found" });
+    }
+
+    const testSubject = "✨ Sparkle Spins Test Notification";
+    const testHtml = `
+      <div style="font-family: sans-serif; padding: 24px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; max-width: 500px;">
+        <h2 style="color: #4338ca; margin-top: 0;">Sparkle Spins Laundry</h2>
+        <p style="font-size: 14px; color: #334155;">This is a test notification confirming that the Sparkle Spins Order Email Notification System is active and configured correctly for all operations alert recipients.</p>
+        <div style="font-size: 12px; color: #64748b; margin-top: 16px;">Sent at: ${new Date().toLocaleString()}</div>
+      </div>
+    `;
+
+    const logs: EmailNotificationLog[] = [];
+    for (const rec of recipients) {
+      if (emailTransporter) {
+        try {
+          await emailTransporter.sendMail({
+            from: `"${notificationSettings.senderName}" <${notificationSettings.senderEmail}>`,
+            to: rec,
+            subject: testSubject,
+            html: testHtml,
+            text: "Sparkle Spins Email Notification System is operational."
+          });
+        } catch (e) {
+          console.warn(`[Test Mailer] Failed for ${rec}:`, e);
+        }
+      }
+
+      const log: EmailNotificationLog = {
+        id: "mail_test_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+        type: "custom",
+        recipient: rec,
+        subject: testSubject,
+        status: emailTransporter ? "sent" : "simulated",
+        sentAt: new Date().toISOString(),
+        previewSnippet: "Test notification verification from Sparkle Spins Operations."
+      };
+
+      inMemoryEmailLogs.unshift(log);
+      saveToFirestore("notification_logs", log.id, log);
+      logs.push(log);
+    }
+
+    res.json({ success: true, log: logs[0], logs, count: logs.length, simulated: !emailTransporter });
+  } catch (testErr: any) {
+    console.error("[Test Email Error]", testErr);
+    res.status(500).json({ error: testErr?.message || "Failed to dispatch test email" });
   }
 });
 

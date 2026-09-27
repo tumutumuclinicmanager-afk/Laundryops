@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Customer, Driver, ServiceItem, OrderItem } from "../types";
-import { Plus, Trash2, Calendar, User, Truck, DollarSign } from "lucide-react";
+import { Plus, Trash2, Calendar, User, Truck, DollarSign, Mail, Send } from "lucide-react";
 
 interface CreateOrderModalProps {
   customers: Customer[];
@@ -8,7 +8,7 @@ interface CreateOrderModalProps {
   services: ServiceItem[];
   onClose: () => void;
   onSaveOrder: (orderData: any) => void;
-  onAddCustomerInline: (customer: { name: string; phone: string; address: string }) => Promise<Customer>;
+  onAddCustomerInline: (customer: { name: string; phone: string; address: string; email?: string }) => Promise<Customer>;
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
@@ -25,6 +25,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   // New customer fields
   const [newCustName, setNewCustName] = useState("");
   const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustEmail, setNewCustEmail] = useState("");
   const [newCustAddress, setNewCustAddress] = useState("");
 
   const [pickupDate, setPickupDate] = useState(new Date().toISOString().split("T")[0]);
@@ -36,6 +37,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [driverId, setDriverId] = useState("");
   const [discount, setDiscount] = useState("0");
   const [notes, setNotes] = useState("");
+  const [sendEmailNotification, setSendEmailNotification] = useState(true);
 
   // Order items selected
   const [selectedItems, setSelectedItems] = useState<Array<{ serviceId: string; quantity: number }>>([
@@ -68,9 +70,12 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
   const total = Math.max(0, subtotal - Number(discount));
 
+  const selectedCustObj = customers.find(c => c.id === selectedCustomerId);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let custId = selectedCustomerId;
+    let finalEmail = selectedCustObj?.email;
 
     if (isNewCustomer) {
       if (!newCustName || !newCustPhone || !newCustAddress) {
@@ -80,9 +85,11 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       const created = await onAddCustomerInline({
         name: newCustName,
         phone: newCustPhone,
-        address: newCustAddress
+        address: newCustAddress,
+        email: newCustEmail.trim() || undefined
       });
       custId = created.id;
+      finalEmail = created.email;
     }
 
     if (!custId) {
@@ -97,6 +104,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
     onSaveOrder({
       customerId: custId,
+      customerEmail: isNewCustomer ? (newCustEmail.trim() || undefined) : finalEmail,
       pickupDate,
       pickupTimeWindow,
       deliveryDate,
@@ -104,7 +112,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       driverId: driverId || undefined,
       items: selectedItems,
       discount: Number(discount),
-      notes
+      notes,
+      sendEmailConfirmation: sendEmailNotification
     });
   };
 
@@ -150,7 +159,17 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     required
                     value={newCustPhone}
                     onChange={(e) => setNewCustPhone(e.target.value)}
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="+254 712 345678"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address (Optional)</label>
+                  <input
+                    type="email"
+                    value={newCustEmail}
+                    onChange={(e) => setNewCustEmail(e.target.value)}
+                    placeholder="customer@example.com"
                     className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -167,15 +186,23 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </div>
               </div>
             ) : (
-              <select
-                value={selectedCustomerId}
-                onChange={(e) => setSelectedCustomerId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} — {c.phone} ({c.address})</option>
-                ))}
-              </select>
+              <div>
+                <select
+                  value={selectedCustomerId}
+                  onChange={(e) => setSelectedCustomerId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} — {c.phone} {c.email ? `(${c.email})` : ''} ({c.address})</option>
+                  ))}
+                </select>
+                {selectedCustObj?.email && (
+                  <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium">
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>Customer Email: {selectedCustObj.email}</span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -347,6 +374,28 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               placeholder="e.g. Leave with concierge, extra fabric softener"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm"
             />
+          </div>
+
+          {/* Email Notification Option */}
+          <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                <Mail className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-800">Dispatch Order Confirmation Email</div>
+                <div className="text-[11px] text-slate-500">Sends itemized summary & pickup schedule to customer & laundry team</div>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sendEmailNotification}
+                onChange={(e) => setSendEmailNotification(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">

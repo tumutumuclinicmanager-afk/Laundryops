@@ -2,12 +2,13 @@
   "entities": {
     "Customer": {
       "title": "Customer",
-      "description": "Customer entity",
+      "description": "Customer entity profile with contact and delivery location",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
         "phone": { "type": "string" },
+        "email": { "type": "string" },
         "address": { "type": "string" },
         "notes": { "type": "string" },
         "createdAt": { "type": "string" }
@@ -16,7 +17,7 @@
     },
     "Driver": {
       "title": "Driver",
-      "description": "Driver/Rider entity",
+      "description": "Logistics rider and driver entity",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -31,7 +32,7 @@
     },
     "ServiceItem": {
       "title": "ServiceItem",
-      "description": "Service item entity",
+      "description": "Laundry and dry cleaning catalog item",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -44,39 +45,56 @@
     },
     "Order": {
       "title": "Order",
-      "description": "Laundry order entity",
+      "description": "Comprehensive laundry order record",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
         "customerId": { "type": "string" },
         "customerName": { "type": "string" },
         "customerPhone": { "type": "string" },
-        "deliveryAddress": { "type": "string" },
-        "items": { "type": "array" },
-        "totalAmount": { "type": "number" },
+        "customerEmail": { "type": "string" },
+        "customerAddress": { "type": "string" },
         "status": { "type": "string" },
+        "pickupDate": { "type": "string" },
+        "pickupTimeWindow": { "type": "string" },
+        "deliveryDate": { "type": "string" },
+        "deliveryTimeWindow": { "type": "string" },
+        "driverId": { "type": "string" },
+        "driverName": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "total": { "type": "number" },
         "paymentStatus": { "type": "string" },
-        "pickupDriverId": { "type": "string" },
-        "deliveryDriverId": { "type": "string" },
-        "scheduledPickup": { "type": "string" },
-        "scheduledDelivery": { "type": "string" },
+        "amountPaid": { "type": "number" },
+        "balanceDue": { "type": "number" },
         "notes": { "type": "string" },
         "proofOfDelivery": { "type": "string" },
-        "createdAt": { "type": "string" }
+        "invoiceSent": { "type": "boolean" },
+        "invoiceSentAt": { "type": "string" },
+        "emailSent": { "type": "boolean" },
+        "emailSentAt": { "type": "string" },
+        "emailHistory": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
       },
-      "required": ["id", "customerId", "totalAmount", "status"]
+      "required": ["id", "orderNumber", "customerName", "customerPhone", "total", "status"]
     },
     "Payment": {
       "title": "Payment",
-      "description": "Payment record entity",
+      "description": "Financial transaction and payment receipt record",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "orderId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "customerName": { "type": "string" },
         "amount": { "type": "number" },
         "method": { "type": "string" },
         "reference": { "type": "string" },
-        "createdAt": { "type": "string" }
+        "date": { "type": "string" },
+        "notes": { "type": "string" }
       },
       "required": ["id", "orderId", "amount", "method"]
     },
@@ -94,32 +112,73 @@
         "verified": { "type": "boolean" }
       },
       "required": ["id", "customerName", "rating", "comment"]
+    },
+    "NotificationLog": {
+      "title": "NotificationLog",
+      "description": "Email and SMS dispatch audit log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "type": { "type": "string" },
+        "recipient": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "subject": { "type": "string" },
+        "status": { "type": "string" },
+        "sentAt": { "type": "string" },
+        "previewSnippet": { "type": "string" },
+        "error": { "type": "string" }
+      },
+      "required": ["id", "recipient", "status", "sentAt"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Operations and notification configuration",
+      "type": "object",
+      "properties": {
+        "adminEmail": { "type": "string" },
+        "autoSendOrderConfirmation": { "type": "boolean" },
+        "autoSendStatusUpdates": { "type": "boolean" },
+        "autoSendAdminAlerts": { "type": "boolean" },
+        "senderName": { "type": "string" },
+        "senderEmail": { "type": "string" },
+        "smtpConfigured": { "type": "boolean" }
+      }
     }
   },
   "firestore": {
     "/customers/{customerId}": {
       "schema": "Customer",
-      "description": "Customers collection"
+      "description": "Customer profiles and contact book"
     },
     "/drivers/{driverId}": {
       "schema": "Driver",
-      "description": "Drivers collection"
+      "description": "Delivery riders and drivers directory"
     },
     "/services/{serviceId}": {
       "schema": "ServiceItem",
-      "description": "Services collection"
+      "description": "Laundry services catalog and pricing"
     },
     "/orders/{orderId}": {
       "schema": "Order",
-      "description": "Orders collection"
+      "description": "Primary laundry operations orders collection"
     },
     "/payments/{paymentId}": {
       "schema": "Payment",
-      "description": "Payments collection"
+      "description": "Financial records and customer receipts"
     },
     "/reviews/{reviewId}": {
       "schema": "Review",
-      "description": "Customer reviews and testimonials collection"
+      "description": "Public customer feedback and testimonials"
+    },
+    "/notification_logs/{logId}": {
+      "schema": "NotificationLog",
+      "description": "Audit logs of sent customer and admin notification emails"
+    },
+    "/settings/{settingId}": {
+      "schema": "Settings",
+      "description": "Operations configuration and notification preferences"
     }
   }
 }

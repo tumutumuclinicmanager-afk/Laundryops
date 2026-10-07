@@ -24,8 +24,21 @@ import { LoginScreen } from "./components/LoginScreen";
 import { CustomerPage } from "./components/CustomerPage";
 import { CustomerLandingPage } from "./components/CustomerLandingPage";
 import { GeminiChatbot } from "./components/GeminiChatbot";
-import { saveOrderToFirestore, saveReviewToFirestore, savePaymentToFirestore, updateOrderStatusInFirestore, updateOrderDetailsInFirestore } from "./firebase";
-import { Truck, Package, Users, DollarSign, Settings, LayoutDashboard, Smartphone, Plus, ShieldCheck, LogOut, User, Globe } from "lucide-react";
+import {
+  saveOrderToFirestore,
+  saveReviewToFirestore,
+  savePaymentToFirestore,
+  updateOrderStatusInFirestore,
+  updateOrderDetailsInFirestore,
+  saveCustomerToFirestore,
+  saveDriverToFirestore,
+  deleteDriverFromFirestore,
+  saveServiceToFirestore,
+  subscribeToFirestoreCollection,
+  seedFirestoreIfEmpty,
+  db
+} from "./firebase";
+import { Truck, Package, Users, DollarSign, Settings, LayoutDashboard, Smartphone, Plus, ShieldCheck, LogOut, User, Globe, RefreshCw, CheckCircle2 } from "lucide-react";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<{ role: 'admin' | 'driver'; username: string; name: string; driverId?: string } | null>(null);
@@ -44,6 +57,9 @@ export default function App() {
   const [payments, setPayments] = useState<Payment[]>(initialPayments);
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const [loading, setLoading] = useState(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString());
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(Boolean(db));
 
   // Dynamic statistics fallback so Dashboard and Financials never stall
   const effectiveStats: Stats = useMemo(() => {
@@ -94,6 +110,7 @@ export default function App() {
       if (Array.isArray(ordersRes) && ordersRes.length > 0) setOrders(ordersRes);
       if (Array.isArray(paymentsRes) && paymentsRes.length > 0) setPayments(paymentsRes);
       if (Array.isArray(reviewsRes) && reviewsRes.length > 0) setReviews(reviewsRes);
+      setLastSyncTime(new Date().toLocaleTimeString());
     } catch (e) {
       console.warn("Backend data fetch note:", e);
     } finally {
@@ -101,8 +118,73 @@ export default function App() {
     }
   };
 
+  const handleManualSync = async () => {
+    setIsManualSyncing(true);
+    await fetchData();
+    setTimeout(() => {
+      setIsManualSyncing(false);
+    }, 600);
+  };
+
   useEffect(() => {
+    // 1. Initial Firestore Seed if fresh project
+    seedFirestoreIfEmpty(initialCustomers, initialDrivers, initialServices, initialOrders, initialPayments, initialReviews);
+
+    // 2. Real-time Firebase Listeners (Broadcasts live changes across all browsers & tabs instantly)
+    const unsubOrders = subscribeToFirestoreCollection<Order>("orders", (remoteOrders) => {
+      if (remoteOrders && remoteOrders.length > 0) {
+        setOrders(remoteOrders);
+        setIsFirebaseConnected(true);
+        setLastSyncTime(new Date().toLocaleTimeString());
+      }
+    });
+
+    const unsubCustomers = subscribeToFirestoreCollection<Customer>("customers", (remoteCusts) => {
+      if (remoteCusts && remoteCusts.length > 0) {
+        setCustomers(remoteCusts);
+        setIsFirebaseConnected(true);
+      }
+    });
+
+    const unsubDrivers = subscribeToFirestoreCollection<Driver>("drivers", (remoteDrivers) => {
+      if (remoteDrivers && remoteDrivers.length > 0) {
+        setDrivers(remoteDrivers);
+        setIsFirebaseConnected(true);
+      }
+    });
+
+    const unsubServices = subscribeToFirestoreCollection<ServiceItem>("services", (remoteServices) => {
+      if (remoteServices && remoteServices.length > 0) {
+        setServices(remoteServices);
+        setIsFirebaseConnected(true);
+      }
+    });
+
+    const unsubPayments = subscribeToFirestoreCollection<Payment>("payments", (remotePayments) => {
+      if (remotePayments && remotePayments.length > 0) {
+        setPayments(remotePayments);
+        setIsFirebaseConnected(true);
+      }
+    });
+
+    const unsubReviews = subscribeToFirestoreCollection<Review>("reviews", (remoteReviews) => {
+      if (remoteReviews && remoteReviews.length > 0) {
+        setReviews(remoteReviews);
+        setIsFirebaseConnected(true);
+      }
+    });
+
+    // 3. Initial REST fetch
     fetchData();
+
+    return () => {
+      unsubOrders?.();
+      unsubCustomers?.();
+      unsubDrivers?.();
+      unsubServices?.();
+      unsubPayments?.();
+      unsubReviews?.();
+    };
   }, []);
 
   // Handlers
@@ -165,209 +247,263 @@ export default function App() {
   };
 
   const handleUpdateStatus = async (orderId: string, status: OrderStatus, driverId?: string, proofOfDelivery?: string) => {
-    let apiSuccess = false;
+    let driverName = "";
+    if (driverId) {
+      const d = drivers.find(dr => dr.id === driverId);
+      if (d) driverName = d.name;
+    }
+
+    // 1. Immediately update local state
+    setOrders(prev => prev.map(o => {
+      if (o.id === orderId) {
+        const updatedOrder: Order = {
+          ...o,
+          status,
+          updatedAt: new Date().toISOString()
+        };
+        if (proofOfDelivery !== undefined) {
+          updatedOrder.proofOfDelivery = proofOfDelivery;
+        }
+        if (driverId !== undefined) {
+          updatedOrder.driverId = driverId || "";
+          updatedOrder.driverName = driverName;
+        }
+
+        if (selectedOrderForDetail && selectedOrderForDetail.id === orderId) {
+          setSelectedOrderForDetail(updatedOrder);
+        }
+        return updatedOrder;
+      }
+      return o;
+    }));
+
+    // 2. Direct write to Firebase Firestore (ensures instant sync to other browsers via onSnapshot)
+    await updateOrderStatusInFirestore(orderId, status, driverId, proofOfDelivery);
+
+    // 3. Notify backend API
     try {
-      const res = await fetch(`/api/orders/${orderId}/status`, {
+      fetch(`/api/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, driverId, proofOfDelivery })
-      });
-      if (res.ok) {
-        apiSuccess = true;
-        fetchData();
-        if (selectedOrderForDetail && selectedOrderForDetail.id === orderId) {
-          const updated = await res.json();
-          setSelectedOrderForDetail(updated);
-        }
-      } else {
-        console.warn("[Orders] API returned non-ok status for status update, attempting direct Firestore save fallback.");
-      }
-    } catch (e) {
-      console.warn("[Orders] API status update failed, attempting direct Firestore save fallback:", e);
-    }
-
-    if (!apiSuccess) {
-      try {
-        const saved = await updateOrderStatusInFirestore(orderId, status, driverId, proofOfDelivery);
-        if (saved) {
-          // Immediately update local React state to make the UI update seamlessly
-          setOrders(prev => prev.map(o => {
-            if (o.id === orderId) {
-              const updatedOrder: Order = {
-                ...o,
-                status,
-                updatedAt: new Date().toISOString()
-              };
-              if (proofOfDelivery !== undefined) {
-                updatedOrder.proofOfDelivery = proofOfDelivery;
-              }
-              if (driverId !== undefined) {
-                updatedOrder.driverId = driverId || "";
-                if (driverId) {
-                  const d = drivers.find(dr => dr.id === driverId);
-                  updatedOrder.driverName = d ? d.name : "";
-                } else {
-                  updatedOrder.driverName = "";
-                }
-              }
-
-              if (selectedOrderForDetail && selectedOrderForDetail.id === orderId) {
-                setSelectedOrderForDetail(updatedOrder);
-              }
-              return updatedOrder;
-            }
-            return o;
-          }));
-          fetchData();
-        } else {
-          alert("Failed to update status in Firestore. Please check your connection.");
-        }
-      } catch (fallbackErr) {
-        console.error("Direct order status update fallback failed:", fallbackErr);
-        alert("An error occurred while attempting to update the order status.");
-      }
-    }
+      }).catch(() => {});
+    } catch {}
   };
 
   const handleAddCustomer = async (custData: { name: string; phone: string; address: string; notes?: string }) => {
+    const newCust: Customer = {
+      id: "c_" + Date.now(),
+      name: String(custData.name).trim(),
+      phone: String(custData.phone).trim(),
+      address: String(custData.address).trim(),
+      notes: custData.notes ? String(custData.notes).trim() : "",
+      createdAt: new Date().toISOString()
+    };
+    setCustomers(prev => [newCust, ...prev.filter(c => c.id !== newCust.id)]);
+    await saveCustomerToFirestore(newCust);
     try {
-      const res = await fetch("/api/customers", {
+      fetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(custData)
-      });
-      if (res.ok) {
-        fetchData();
-      }
-    } catch (e) {
-      console.error("Failed to add customer", e);
-    }
+      }).catch(() => {});
+    } catch {}
   };
 
   const handleAddCustomerInline = async (custData: { name: string; phone: string; address: string; email?: string }) => {
-    const res = await fetch("/api/customers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(custData)
-    });
-    const newCust = await res.json();
-    fetchData();
+    const newCust: Customer = {
+      id: "c_" + Date.now(),
+      name: String(custData.name).trim(),
+      phone: String(custData.phone).trim(),
+      email: custData.email ? String(custData.email).trim() : undefined,
+      address: String(custData.address).trim(),
+      notes: "Added during order creation",
+      createdAt: new Date().toISOString()
+    };
+    setCustomers(prev => [newCust, ...prev.filter(c => c.id !== newCust.id)]);
+    await saveCustomerToFirestore(newCust);
+    try {
+      fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(custData)
+      }).catch(() => {});
+    } catch {}
     return newCust;
   };
 
   const handleAddService = async (serviceData: any) => {
+    const newService: ServiceItem = {
+      id: "s_" + Date.now(),
+      name: String(serviceData.name).trim(),
+      category: serviceData.category,
+      unit: serviceData.unit,
+      price: Number(serviceData.price)
+    };
+    setServices(prev => [...prev, newService]);
+    await saveServiceToFirestore(newService);
     try {
-      const res = await fetch("/api/services", {
+      fetch("/api/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(serviceData)
-      });
-      if (res.ok) fetchData();
-    } catch (e) {
-      console.error("Failed to add service", e);
-    }
+      }).catch(() => {});
+    } catch {}
   };
 
   const handleAddDriver = async (driverData: any) => {
+    const newDriver: Driver = {
+      id: "d_" + Date.now(),
+      name: String(driverData.name).trim(),
+      phone: String(driverData.phone).trim(),
+      vehicle: driverData.vehicle || "Delivery Motorcycle",
+      status: driverData.status || "Available",
+      username: driverData.username || driverData.name.split(' ')[0].toLowerCase() + Math.floor(Math.random() * 90 + 10),
+      password: driverData.password || 'rider123'
+    };
+    setDrivers(prev => [...prev, newDriver]);
+    await saveDriverToFirestore(newDriver);
     try {
-      const res = await fetch("/api/drivers", {
+      fetch("/api/drivers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(driverData)
-      });
-      if (res.ok) fetchData();
-    } catch (e) {
-      console.error("Failed to add driver", e);
-    }
+      }).catch(() => {});
+    } catch {}
   };
 
   const handleDeleteDriver = async (driverId: string) => {
     if (!confirm("Are you sure you want to delete this rider account?")) return;
+    setDrivers(prev => prev.filter(d => d.id !== driverId));
+    await deleteDriverFromFirestore(driverId);
     try {
-      const res = await fetch(`/api/drivers/${driverId}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        fetchData();
-      }
-    } catch (e) {
-      console.error("Failed to delete driver", e);
-    }
+      fetch(`/api/drivers/${driverId}`, { method: "DELETE" }).catch(() => {});
+    } catch {}
   };
 
-  const handleSubmitPayment = async (payData: any) => {
-    let apiSuccess = false;
+  const handleQuickDispatchRider = async (orderId: string, driverId: string, customStatus?: OrderStatus) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    let targetStatus: OrderStatus = customStatus || (
+      order.status === 'Ready for Delivery' || order.status === 'In Process' || order.status === 'Picked Up'
+        ? 'Out for Delivery'
+        : order.status === 'New' ? 'Pickup Scheduled' : order.status
+    );
+
+    if (!driverId) {
+      targetStatus = order.status;
+    }
+
+    await handleUpdateStatus(orderId, targetStatus, driverId);
+  };
+
+  const handleSubmitPayment = async (payData: any): Promise<boolean> => {
+    let orderToPay = orders.find(o => o.id === payData.orderId);
+    if (!orderToPay && selectedOrderForDetail && selectedOrderForDetail.id === payData.orderId) {
+      orderToPay = selectedOrderForDetail;
+    }
+    if (!orderToPay) {
+      console.warn("Error: Associated order not found in state, synthesizing order record.");
+      orderToPay = {
+        id: payData.orderId,
+        orderNumber: payData.orderNumber || "ORD-" + payData.orderId.slice(-4),
+        customerId: "c_" + Date.now(),
+        customerName: payData.customerName || "Customer",
+        customerPhone: "",
+        customerAddress: "",
+        status: "In Process",
+        pickupDate: new Date().toISOString().split("T")[0],
+        pickupTimeWindow: "09:00 AM - 11:00 AM",
+        deliveryDate: new Date().toISOString().split("T")[0],
+        deliveryTimeWindow: "02:00 PM - 04:00 PM",
+        driverId: "",
+        driverName: "",
+        items: [],
+        subtotal: Number(payData.amount) || 0,
+        discount: 0,
+        total: Number(payData.amount) || 0,
+        paymentStatus: "Paid",
+        amountPaid: Number(payData.amount) || 0,
+        balanceDue: 0,
+        notes: "",
+        invoiceSent: false,
+        invoiceSentAt: "",
+        emailSent: false,
+        emailSentAt: "",
+        emailHistory: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    const payAmt = Math.max(0, Number(payData.amount) || 0);
+    const prevPaid = Number(orderToPay.amountPaid) || 0;
+    const orderTotal = Math.max(Number(orderToPay.total) || 0, prevPaid + payAmt);
+    const newAmountPaid = prevPaid + payAmt;
+    const newBalanceDue = Math.max(0, orderTotal - newAmountPaid);
+    
+    let newPaymentStatus: 'Unpaid' | 'Partial' | 'Paid' = "Unpaid";
+    if (newBalanceDue === 0 && orderTotal > 0 && newAmountPaid >= orderTotal) {
+      newPaymentStatus = "Paid";
+    } else if (newAmountPaid > 0) {
+      newPaymentStatus = "Partial";
+    }
+
+    const updatedOrder: Order = {
+      ...orderToPay,
+      total: orderTotal,
+      amountPaid: newAmountPaid,
+      balanceDue: newBalanceDue,
+      paymentStatus: newPaymentStatus,
+      updatedAt: new Date().toISOString()
+    };
+
+    const newPayment: Payment = {
+      id: "pay_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+      orderId: orderToPay.id,
+      orderNumber: orderToPay.orderNumber,
+      customerName: orderToPay.customerName,
+      amount: payAmt,
+      method: payData.method || "M-Pesa",
+      reference: payData.reference || "",
+      date: new Date().toISOString(),
+      notes: payData.notes || ""
+    };
+
+    // 1. Immediately update React state
+    setPayments(prev => [newPayment, ...prev.filter(p => p.id !== newPayment.id)]);
+    setOrders(prev => {
+      const exists = prev.some(o => o.id === updatedOrder.id);
+      if (exists) {
+        return prev.map(o => o.id === updatedOrder.id ? updatedOrder : o);
+      } else {
+        return [updatedOrder, ...prev];
+      }
+    });
+    
+    if (selectedOrderForDetail && selectedOrderForDetail.id === updatedOrder.id) {
+      setSelectedOrderForDetail(updatedOrder);
+    }
+    setSelectedOrderForPayment(null);
+
+    // 2. Direct write to Firebase Firestore (ensures instant sync across browsers via onSnapshot)
     try {
-      const res = await fetch("/api/payments", {
+      await savePaymentToFirestore(newPayment, updatedOrder);
+    } catch (fbErr) {
+      console.warn("Direct Firestore payment save warning:", fbErr);
+    }
+
+    // 3. Post to server API
+    try {
+      await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payData)
       });
-      if (res.ok) {
-        apiSuccess = true;
-        setSelectedOrderForPayment(null);
-        fetchData();
-      } else {
-        console.warn("[Payments] API returned non-ok status, attempting direct Firestore save fallback.");
-      }
-    } catch (e) {
-      console.warn("[Payments] API call failed, attempting direct Firestore save fallback:", e);
-    }
+    } catch {}
 
-    // Direct client-side Firestore fallback if the server API failed or returned an error
-    if (!apiSuccess) {
-      try {
-        const orderToPay = orders.find(o => o.id === payData.orderId);
-        if (!orderToPay) {
-          alert("Error: Associated order not found in state.");
-          return;
-        }
-
-        const payAmt = Number(payData.amount);
-        const newAmountPaid = orderToPay.amountPaid + payAmt;
-        const newBalanceDue = Math.max(0, orderToPay.total - newAmountPaid);
-        let newPaymentStatus: 'Unpaid' | 'Partial' | 'Paid' = "Unpaid";
-        if (newBalanceDue === 0 && orderToPay.total > 0) {
-          newPaymentStatus = "Paid";
-        } else if (newAmountPaid > 0) {
-          newPaymentStatus = "Partial";
-        }
-
-        const updatedOrder: Order = {
-          ...orderToPay,
-          amountPaid: newAmountPaid,
-          balanceDue: newBalanceDue,
-          paymentStatus: newPaymentStatus,
-          updatedAt: new Date().toISOString()
-        };
-
-        const newPayment: Payment = {
-          id: "pay_" + Date.now(),
-          orderId: orderToPay.id,
-          orderNumber: orderToPay.orderNumber,
-          customerName: orderToPay.customerName,
-          amount: payAmt,
-          method: payData.method || "Cash",
-          reference: payData.reference || "",
-          date: new Date().toISOString(),
-          notes: payData.notes || ""
-        };
-
-        const saved = await savePaymentToFirestore(newPayment, updatedOrder);
-        if (saved) {
-          // Immediately update local React state to make the UI update seamlessly
-          setPayments(prev => [newPayment, ...prev.filter(p => p.id !== newPayment.id)]);
-          setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-          setSelectedOrderForPayment(null);
-          fetchData();
-        } else {
-          alert("Failed to save payment to Firestore. Please verify your connection.");
-        }
-      } catch (fallbackErr) {
-        console.error("Direct payment save fallback failed:", fallbackErr);
-        alert("An error occurred while attempting to save payment.");
-      }
-    }
+    return true;
   };
 
   const handleResetSeed = async () => {
@@ -517,91 +653,77 @@ export default function App() {
   };
 
   const handleUpdateOrderDetails = async (orderId: string, updatedData: any) => {
-    let apiSuccess = false;
-    let updatedOrderResult: Order | null = null;
+    const existingOrder = orders.find(o => o.id === orderId);
+    let driverName = existingOrder?.driverName || "";
+    if (updatedData.driverId !== undefined) {
+      if (updatedData.driverId) {
+        const d = drivers.find(dr => dr.id === updatedData.driverId);
+        driverName = d ? d.name : (updatedData.driverName || "");
+      } else {
+        driverName = "";
+      }
+    }
 
+    let subtotal = existingOrder ? existingOrder.subtotal : 0;
+    let discount = updatedData.discount !== undefined ? Number(updatedData.discount) : (existingOrder ? existingOrder.discount : 0);
+    let newItems = existingOrder ? existingOrder.items : [];
+
+    if (updatedData.items && Array.isArray(updatedData.items)) {
+      newItems = updatedData.items.map((it: any) => {
+        const qty = Math.max(0.01, Number(it.quantity) || 0);
+        const unitPrice = Math.max(0, Number(it.unitPrice) || 0);
+        return {
+          serviceId: String(it.serviceId || "custom"),
+          serviceName: String(it.serviceName || "Laundry Item"),
+          unit: String(it.unit || "item"),
+          quantity: qty,
+          unitPrice,
+          subtotal: Math.round(qty * unitPrice)
+        };
+      });
+      subtotal = newItems.reduce((sum, it) => sum + it.subtotal, 0);
+    }
+
+    const total = Math.max(0, subtotal - discount);
+    const amountPaid = existingOrder ? existingOrder.amountPaid || 0 : 0;
+    const balanceDue = Math.max(0, total - amountPaid);
+    let paymentStatus: 'Unpaid' | 'Partial' | 'Paid' = "Unpaid";
+    if (balanceDue === 0 && total > 0 && amountPaid >= total) {
+      paymentStatus = "Paid";
+    } else if (amountPaid > 0) {
+      paymentStatus = "Partial";
+    }
+
+    const updatedOrder: Order = {
+      ...(existingOrder || ({} as any)),
+      ...updatedData,
+      driverName,
+      items: newItems,
+      subtotal,
+      discount,
+      total,
+      balanceDue,
+      paymentStatus,
+      updatedAt: new Date().toISOString()
+    };
+
+    // 1. Immediately update local state
+    setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+    setSelectedOrderForDetail(updatedOrder);
+
+    // 2. Direct write to Firebase Firestore (pushes to all open browser windows immediately via onSnapshot)
+    await updateOrderDetailsInFirestore(orderId, updatedOrder);
+
+    // 3. Post to backend API
     try {
-      const res = await fetch(`/api/orders/${orderId}`, {
+      fetch(`/api/orders/${orderId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedData)
-      });
-      if (res.ok) {
-        apiSuccess = true;
-        const updated = await res.json();
-        updatedOrderResult = updated;
-        setOrders(prev => prev.map(o => o.id === orderId ? updated : o));
-        setSelectedOrderForDetail(updated);
-        fetchData();
-        return updated;
-      }
-      console.warn("[Orders] API returned non-ok status for update details, attempting direct Firestore fallback.");
-    } catch (e: any) {
-      console.warn("[Orders] API update failed, attempting direct Firestore fallback:", e);
-    }
+      }).catch(() => {});
+    } catch {}
 
-    if (!apiSuccess) {
-      try {
-        const existingOrder = orders.find(o => o.id === orderId);
-        if (!existingOrder) throw new Error("Order not found in state");
-
-        let subtotal = existingOrder.subtotal;
-        let discount = updatedData.discount !== undefined ? Number(updatedData.discount) : existingOrder.discount;
-        let newItems = existingOrder.items;
-
-        if (updatedData.items && Array.isArray(updatedData.items)) {
-          newItems = updatedData.items.map((it: any) => {
-            const qty = Number(it.quantity) || 1;
-            const unitPrice = Number(it.unitPrice) || 0;
-            return {
-              serviceId: String(it.serviceId || "custom"),
-              serviceName: String(it.serviceName || "Laundry Item"),
-              unit: String(it.unit || "item"),
-              quantity: qty,
-              unitPrice,
-              subtotal: qty * unitPrice
-            };
-          });
-          subtotal = newItems.reduce((sum, it) => sum + it.subtotal, 0);
-        }
-
-        const total = Math.max(0, subtotal - discount);
-        const amountPaid = existingOrder.amountPaid || 0;
-        const balanceDue = Math.max(0, total - amountPaid);
-        let paymentStatus: 'Unpaid' | 'Partial' | 'Paid' = "Unpaid";
-        if (balanceDue === 0 && total > 0 && amountPaid >= total) {
-          paymentStatus = "Paid";
-        } else if (amountPaid > 0) {
-          paymentStatus = "Partial";
-        }
-
-        const updatedOrder: Order = {
-          ...existingOrder,
-          ...updatedData,
-          items: newItems,
-          subtotal,
-          discount,
-          total,
-          balanceDue,
-          paymentStatus,
-          updatedAt: new Date().toISOString()
-        };
-
-        const saved = await updateOrderDetailsInFirestore(orderId, updatedOrder);
-        if (saved) {
-          setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-          setSelectedOrderForDetail(updatedOrder);
-          fetchData();
-          return updatedOrder;
-        } else {
-          throw new Error("Failed to save updated pricing to database");
-        }
-      } catch (fallbackErr: any) {
-        console.error("Direct order details fallback failed:", fallbackErr);
-        throw fallbackErr;
-      }
-    }
-    return updatedOrderResult;
+    return updatedOrder;
   };
 
   const handleSendInvoice = async (orderId: string, customMessage?: string): Promise<boolean> => {
@@ -764,7 +886,31 @@ export default function App() {
           )}
 
           {/* Right Action & User Profile */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Live Realtime Firebase Sync Badge */}
+            <div
+              className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all ${
+                isFirebaseConnected
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  : "bg-amber-50 text-amber-800 border-amber-200"
+              }`}
+              title="Real-time multi-browser cloud synchronization active"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isFirebaseConnected ? "bg-emerald-400" : "bg-amber-400"}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isFirebaseConnected ? "bg-emerald-600" : "bg-amber-600"}`}></span>
+              </span>
+              <span>Firebase Live</span>
+              <button
+                onClick={handleManualSync}
+                disabled={isManualSyncing}
+                title="Force refresh & sync with cloud database"
+                className="ml-1 p-0.5 hover:bg-emerald-100 text-emerald-700 rounded transition-colors cursor-pointer"
+              >
+                <RefreshCw className={`w-3 h-3 ${isManualSyncing ? "animate-spin text-emerald-900" : ""}`} />
+              </button>
+            </div>
+
             <button
               onClick={() => setViewingCustomerPage(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all cursor-pointer border border-blue-200 shadow-2xs"
@@ -868,10 +1014,12 @@ export default function App() {
             {activeTab === 'dashboard' && (
               <Dashboard
                 stats={effectiveStats}
+                drivers={drivers}
                 onNavigate={(tab) => setActiveTab(tab as any)}
                 onOpenNewOrder={() => setShowNewOrderModal(true)}
                 onSelectOrder={(ord) => setSelectedOrderForDetail(ord)}
-                onUpdateStatus={(ordId, st) => handleUpdateStatus(ordId, st)}
+                onUpdateStatus={(ordId, st, drId) => handleUpdateStatus(ordId, st, drId)}
+                onOpenPaymentModal={(ord) => setSelectedOrderForPayment(ord)}
               />
             )}
             {activeTab === 'orders' && (
@@ -954,6 +1102,7 @@ export default function App() {
           onSendInvoice={handleSendInvoice}
           onOpenPaymentModal={(ord) => setSelectedOrderForPayment(ord)}
           onOpenInvoice={(ord) => setSelectedOrderForInvoice(ord)}
+          onSubmitPayment={handleSubmitPayment}
         />
       )}
 

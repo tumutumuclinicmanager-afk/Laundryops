@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Lock, User, Shield, Truck, Sparkles, CheckCircle2, ArrowLeft, ShoppingBag, Eye, EyeOff } from "lucide-react";
+import GhostFibers from "./GhostFibers";
 
 interface LoginScreenProps {
   onLoginSuccess: (user: { role: 'admin' | 'driver'; username: string; name: string; driverId?: string }) => void;
@@ -70,8 +71,38 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, driver
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex flex-col items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(99,102,241,0.15),transparent_50%)]"></div>
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* GhostFibers Animated Background */}
+      <div className="absolute inset-0 z-0 opacity-75 pointer-events-none">
+        <GhostFibers
+          lineColor="#140E35"
+          glowColor="#3437A0"
+          speed={0.2}
+          scale={2}
+          rotation={0}
+          rotationSpeed={0.25}
+          layers={4}
+          waveAmplitude={0.015}
+          waveFrequency={3}
+          waveSpeed={0.15}
+          layerSpeed={0.08}
+          twist={0.1}
+          twistFrequency={5}
+          twistSpeed={1.2}
+          lineFrequency={5}
+          lineSpacing={2}
+          lineSharpness={16}
+          glowFalloff={10}
+          glowIntensity={1.6}
+          brightness={2}
+          blueBoost={1.25}
+          vignette={0.8}
+          grain={0.05}
+          dpr={1}
+        />
+      </div>
+
+      <div className="absolute inset-0 bg-slate-950/40 z-0 pointer-events-none" />
       
       {onGoToCustomerPage && (
         <div className="relative mb-3 z-10">

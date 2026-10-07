@@ -1,21 +1,25 @@
 import React from "react";
-import { Stats, Order } from "../types";
-import { Truck, Package, Clock, DollarSign, AlertCircle, CheckCircle2, ArrowUpRight, Plus, Users, Calendar } from "lucide-react";
+import { Stats, Order, Driver } from "../types";
+import { Truck, Package, Clock, DollarSign, AlertCircle, CheckCircle2, ArrowUpRight, Plus, Users, Calendar, CheckCircle } from "lucide-react";
 
 interface DashboardProps {
   stats: Stats | null;
+  drivers?: Driver[];
   onNavigate: (tab: string) => void;
   onOpenNewOrder: () => void;
   onSelectOrder: (order: Order) => void;
-  onUpdateStatus: (orderId: string, status: Order['status']) => void;
+  onUpdateStatus: (orderId: string, status: Order['status'], driverId?: string) => void;
+  onOpenPaymentModal?: (order: Order) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
   stats,
+  drivers = [],
   onNavigate,
   onOpenNewOrder,
   onSelectOrder,
-  onUpdateStatus
+  onUpdateStatus,
+  onOpenPaymentModal
 }) => {
   // Ensure the dashboard always initializes cleanly without hanging
   const currentStats: Stats = stats || {
@@ -208,7 +212,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div 
                       key={order.id}
                       onClick={() => onSelectOrder(order)}
-                      className="flex items-center justify-between p-3.5 rounded-2xl border border-sky-100 hover:border-emerald-300 bg-sky-50/30 hover:bg-emerald-50/20 transition-all cursor-pointer"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl border border-sky-100 hover:border-emerald-300 bg-sky-50/30 hover:bg-emerald-50/20 transition-all cursor-pointer gap-2"
                     >
                       <div>
                         <div className="flex items-center gap-2">
@@ -218,10 +222,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <p className="text-xs text-slate-500 mt-0.5">{order.customerAddress}</p>
                         <p className="text-xs text-slate-600 font-bold mt-1">🕒 {order.deliveryTimeWindow}</p>
                       </div>
-                      <div className="text-right">
-                        {getStatusBadge(order.status)}
-                        {order.driverName && (
-                          <p className="text-xs text-slate-500 mt-1">Driver: {order.driverName}</p>
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          {getStatusBadge(order.status)}
+                          {order.balanceDue > 0 && onOpenPaymentModal && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenPaymentModal(order)}
+                              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black shadow-2xs transition-all cursor-pointer"
+                            >
+                              Pay KSh {order.balanceDue.toLocaleString()}
+                            </button>
+                          )}
+                        </div>
+                        {order.driverName ? (
+                          <p className="text-xs text-blue-700 font-bold mt-0.5">🛵 {order.driverName}</p>
+                        ) : (
+                          drivers.length > 0 && (
+                            <select
+                              value={order.driverId || ""}
+                              onChange={(e) => {
+                                const did = e.target.value;
+                                if (did) onUpdateStatus(order.id, 'Out for Delivery', did);
+                              }}
+                              className="text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-slate-700 cursor-pointer"
+                            >
+                              <option value="">⚡ Assign Rider...</option>
+                              {drivers.map(d => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                            </select>
+                          )
                         )}
                       </div>
                     </div>
@@ -264,13 +295,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <div className="text-xs text-slate-500">{order.items.length} items • KSh {order.total.toLocaleString()}</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <span className={`text-xs px-2.5 py-1 rounded-xl font-bold ${
                       order.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-700' :
                       order.paymentStatus === 'Partial' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'
                     }`}>
                       {order.paymentStatus}
                     </span>
+                    {order.balanceDue > 0 && onOpenPaymentModal && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenPaymentModal(order)}
+                        className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black shadow-2xs transition-all cursor-pointer"
+                        title={`Record payment of KSh ${order.balanceDue.toLocaleString()}`}
+                      >
+                        Pay KSh {order.balanceDue.toLocaleString()}
+                      </button>
+                    )}
                     {getStatusBadge(order.status)}
                   </div>
                 </div>

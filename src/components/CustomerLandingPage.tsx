@@ -95,22 +95,40 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden">
-      {/* Full-Screen Low-Opacity Animated Background */}
-      <div className="fixed inset-0 z-0 opacity-40 pointer-events-none">
-        <GhostFibers
-          lineColor="#38bdf8"
-          glowColor="#6366f1"
-          speed={0.15}
-          scale={2.2}
-          layers={5}
-          brightness={2.2}
-          blueBoost={1.4}
-          grain={0.03}
-        />
+      {/* GhostFibers Animated Background from React Bits */}
+      <div className="fixed inset-0 z-0 pointer-events-none opacity-80">
+        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+          <GhostFibers
+            lineColor="#140E35"
+            glowColor="#3437A0"
+            speed={0.2}
+            scale={2}
+            rotation={0}
+            rotationSpeed={0.25}
+            layers={4}
+            waveAmplitude={0.015}
+            waveFrequency={3}
+            waveSpeed={0.15}
+            layerSpeed={0.08}
+            twist={0.1}
+            twistFrequency={5}
+            twistSpeed={1.2}
+            lineFrequency={5}
+            lineSpacing={2}
+            lineSharpness={16}
+            glowFalloff={10}
+            glowIntensity={1.6}
+            brightness={2}
+            blueBoost={1.25}
+            vignette={0.8}
+            grain={0.05}
+            dpr={1}
+          />
+        </div>
       </div>
 
-      {/* Ambient Gradient Overlay */}
-      <div className="fixed inset-0 bg-slate-950/80 z-0 pointer-events-none" />
+      {/* Ambient Subtle Gradient Overlay */}
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-950/40 via-slate-950/70 to-slate-950 z-0 pointer-events-none" />
 
       {/* Main Content Wrapper */}
       <div className="relative z-10 flex flex-col min-h-screen">

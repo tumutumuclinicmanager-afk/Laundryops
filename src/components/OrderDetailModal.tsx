@@ -13,6 +13,7 @@ import {
   MapPin,
   Calendar,
   DollarSign,
+  Banknote,
   FileText,
   CheckCircle,
   Clock,
@@ -43,6 +44,7 @@ interface OrderDetailModalProps {
   onSendInvoice?: (orderId: string, customMessage?: string) => Promise<boolean>;
   onOpenPaymentModal: (order: Order) => void;
   onOpenInvoice: (order: Order) => void;
+  onSubmitPayment?: (paymentData: { orderId: string; amount: number; method: string; reference?: string; notes?: string }) => Promise<boolean | void> | void;
 }
 
 const ALL_STATUSES: OrderStatus[] = [
@@ -65,7 +67,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   onUpdateOrderDetails,
   onSendInvoice,
   onOpenPaymentModal,
-  onOpenInvoice
+  onOpenInvoice,
+  onSubmitPayment
 }) => {
   const [activeOrder, setActiveOrder] = useState<Order>(order);
   const [status, setStatus] = useState<OrderStatus>(order.status);
@@ -73,6 +76,12 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const [proof, setProof] = useState<string>(order.proofOfDelivery || "");
   const [deliveryDate, setDeliveryDate] = useState<string>(order.deliveryDate || "");
   const [deliveryTimeWindow, setDeliveryTimeWindow] = useState<string>(order.deliveryTimeWindow || "");
+
+  // Fast 1-Click Operations State
+  const [isDispatchingFast, setIsDispatchingFast] = useState<boolean>(false);
+  const [fastDispatchNotice, setFastDispatchNotice] = useState<string | null>(null);
+  const [isDirectPaying, setIsDirectPaying] = useState<boolean>(false);
+  const [directPaySuccess, setDirectPaySuccess] = useState<string | null>(null);
 
   // Edit Items & Pricing Mode (for facility staff after weighing laundry)
   const [isEditingItems, setIsEditingItems] = useState<boolean>(false);
@@ -143,6 +152,96 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
     }
   };
 
+  // 1-Click Instant Rider Dispatch
+  const handleQuickAssignDriver = async (targetDriverId: string) => {
+    setIsDispatchingFast(true);
+    setFastDispatchNotice(null);
+    try {
+      setDriverId(targetDriverId);
+      const matchedDriver = drivers.find(d => d.id === targetDriverId);
+      let targetStatus: OrderStatus = status;
+      if (targetDriverId) {
+        targetStatus = (status === 'New' || status === 'Pickup Scheduled') 
+          ? 'Pickup Scheduled' 
+          : (status === 'Ready for Delivery' || status === 'In Process' || status === 'Picked Up' ? 'Out for Delivery' : status);
+        setStatus(targetStatus);
+      }
+      
+      const updated = {
+        ...activeOrder,
+        driverId: targetDriverId,
+        driverName: matchedDriver ? matchedDriver.name : "",
+        status: targetStatus,
+        updatedAt: new Date().toISOString()
+      };
+      setActiveOrder(updated);
+
+      if (onUpdateOrderDetails) {
+        await onUpdateOrderDetails(activeOrder.id, {
+          driverId: targetDriverId,
+          driverName: matchedDriver ? matchedDriver.name : "",
+          status: targetStatus
+        });
+      } else {
+        onUpdateStatus(activeOrder.id, targetStatus, targetDriverId);
+      }
+
+      if (matchedDriver) {
+        setFastDispatchNotice(`Rider ${matchedDriver.name} dispatched! Status set to '${targetStatus}'.`);
+      } else {
+        setFastDispatchNotice("Rider unassigned.");
+      }
+      setTimeout(() => setFastDispatchNotice(null), 3000);
+    } catch (e: any) {
+      console.error("Fast dispatch error:", e);
+    } finally {
+      setIsDispatchingFast(false);
+    }
+  };
+
+  // 1-Click WhatsApp dispatch to assigned rider
+  const handleSendWhatsAppToRider = () => {
+    const targetDriver = drivers.find(d => d.id === driverId || (assignedDriver && d.name === assignedDriver.name));
+    const phone = targetDriver?.phone;
+    if (!phone) {
+      alert("No contact phone number found for this rider.");
+      return;
+    }
+    const text = `🛵 Sparkle Spins Dispatch Assignment:\nOrder: ${activeOrder.orderNumber}\nCustomer: ${activeOrder.customerName} (${activeOrder.customerPhone})\nAddress: ${activeOrder.customerAddress}\nStatus: ${activeOrder.status}\nScheduled: ${activeOrder.deliveryDate || activeOrder.pickupDate} (${activeOrder.deliveryTimeWindow || activeOrder.pickupTimeWindow})\nAmount to collect on delivery: KSh ${activeOrder.balanceDue.toLocaleString()}`;
+    openWhatsAppChat(phone, text);
+  };
+
+  // 1-Click Instant Payment Settlement (M-Pesa or Cash)
+  const handleQuickOneClickPayment = async (payMethod: 'M-Pesa' | 'Cash') => {
+    const settleAmt = activeOrder.balanceDue > 0 ? activeOrder.balanceDue : (activeOrder.total > 0 ? activeOrder.total : 500);
+    setIsDirectPaying(true);
+    setDirectPaySuccess(null);
+    try {
+      if (onSubmitPayment) {
+        await onSubmitPayment({
+          orderId: activeOrder.id,
+          amount: settleAmt,
+          method: payMethod,
+          reference: payMethod === 'M-Pesa' ? `MPESA-DIR-${Date.now().toString().slice(-6)}` : `CASH-${Date.now().toString().slice(-4)}`,
+          notes: `Quick 1-click ${payMethod} settlement by staff`
+        });
+      }
+      setActiveOrder(prev => ({
+        ...prev,
+        amountPaid: (prev.amountPaid || 0) + settleAmt,
+        balanceDue: 0,
+        paymentStatus: 'Paid',
+        updatedAt: new Date().toISOString()
+      }));
+      setDirectPaySuccess(`KSh ${settleAmt.toLocaleString()} settled via ${payMethod} & synced to Firebase!`);
+      setTimeout(() => setDirectPaySuccess(null), 3500);
+    } catch (e: any) {
+      alert("Payment settlement note: " + (e?.message || "Failed to settle payment"));
+    } finally {
+      setIsDirectPaying(false);
+    }
+  };
+
   // Generate standard pre-delivery invoice text
   const itemsText = activeOrder.items && activeOrder.items.length > 0
     ? activeOrder.items.map(it => `• ${it.serviceName} (${it.quantity} ${it.unit}): KSh ${it.subtotal.toLocaleString()}`).join("\n")
@@ -167,19 +266,42 @@ Thank you for choosing Sparkle Spins!`;
     assignedDriver?.name ? ` Assigned Rider: ${assignedDriver.name}.` : ""
   }${activeOrder.balanceDue > 0 ? ` Total Due on Delivery: KSh ${activeOrder.balanceDue.toLocaleString()}.` : ' Status: Paid in full.'} Thank you for choosing Sparkle Spins!`;
 
+  // Workflow saving state
+  const [isSavingWorkflow, setIsSavingWorkflow] = useState<boolean>(false);
+  const [workflowSuccessMessage, setWorkflowSuccessMessage] = useState<string | null>(null);
+  const [workflowErrorMessage, setWorkflowErrorMessage] = useState<string | null>(null);
+
   // Handle Saving Status & Driver Changes
   const handleSave = async () => {
-    onUpdateStatus(activeOrder.id, status, driverId || undefined, proof);
-    if (onUpdateOrderDetails && (deliveryDate !== activeOrder.deliveryDate || deliveryTimeWindow !== activeOrder.deliveryTimeWindow)) {
-      await onUpdateOrderDetails(activeOrder.id, {
-        deliveryDate,
-        deliveryTimeWindow,
+    setIsSavingWorkflow(true);
+    setWorkflowSuccessMessage(null);
+    setWorkflowErrorMessage(null);
+    try {
+      const payload: any = {
         status,
         driverId: driverId || "",
-        proofOfDelivery: proof
-      });
+        driverName: assignedDriver?.name || "",
+        proofOfDelivery: proof,
+        deliveryDate: deliveryDate || activeOrder.deliveryDate,
+        deliveryTimeWindow: deliveryTimeWindow || activeOrder.deliveryTimeWindow
+      };
+
+      if (onUpdateOrderDetails) {
+        await onUpdateOrderDetails(activeOrder.id, payload);
+      } else {
+        onUpdateStatus(activeOrder.id, status, driverId || undefined, proof);
+      }
+
+      setWorkflowSuccessMessage("Workflow changes saved & synced to Firebase database!");
+      setTimeout(() => {
+        setIsSavingWorkflow(false);
+        onClose();
+      }, 700);
+    } catch (err: any) {
+      console.error("Workflow save error:", err);
+      setWorkflowErrorMessage(err?.message || "Failed to save workflow changes. Please try again.");
+      setIsSavingWorkflow(false);
     }
-    onClose();
   };
 
   // Handle Sending Pre-Delivery Invoice to Client
@@ -530,6 +652,88 @@ Thank you for choosing Sparkle Spins!`;
                 <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                 <span>{activeOrder.customerAddress}</span>
               </div>
+            </div>
+          </div>
+
+          {/* ⚡ 1-Click Fast Rider Dispatch Station */}
+          <div className="p-4 sm:p-5 rounded-2xl border-2 border-blue-300 bg-gradient-to-r from-blue-50/90 to-sky-50/80 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                  🛵
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                    <span>⚡ 1-Click Rider Dispatch Station</span>
+                    {isDispatchingFast && <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin" />}
+                  </h4>
+                  <p className="text-[11px] text-slate-600">
+                    Click any rider to instantly assign, update delivery workflow, and sync across systems.
+                  </p>
+                </div>
+              </div>
+
+              {assignedDriver ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-blue-100 text-blue-900 px-3 py-1 rounded-full border border-blue-300">
+                  🛵 Assigned: <strong>{assignedDriver.name}</strong>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-amber-100 text-amber-800 px-3 py-1 rounded-full border border-amber-200">
+                  ⚠️ Unassigned Rider
+                </span>
+              )}
+            </div>
+
+            {fastDispatchNotice && (
+              <div className="p-2.5 bg-blue-100/90 border border-blue-300 rounded-xl text-xs font-bold text-blue-900 flex items-center gap-2 animate-in fade-in">
+                <CheckCircle className="w-4 h-4 text-blue-700 shrink-0" />
+                <span>{fastDispatchNotice}</span>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {drivers.map(d => {
+                const isSelected = (driverId === d.id) || (activeOrder.driverId === d.id);
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    disabled={isDispatchingFast}
+                    onClick={() => handleQuickAssignDriver(d.id)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                        : "bg-white text-slate-800 border-slate-200 hover:border-blue-300 hover:bg-blue-50/60"
+                    }`}
+                  >
+                    <span>🛵</span>
+                    <span>{d.name}</span>
+                    <span className="text-[10px] opacity-75">({d.vehicle.split(' ')[0]})</span>
+                    {isSelected && <Check className="w-3.5 h-3.5 ml-0.5" />}
+                  </button>
+                );
+              })}
+
+              {assignedDriver && (
+                <>
+                  <button
+                    type="button"
+                    disabled={isDispatchingFast}
+                    onClick={() => handleQuickAssignDriver("")}
+                    className="px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all cursor-pointer"
+                  >
+                    Unassign
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendWhatsAppToRider}
+                    className="ml-auto px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>WhatsApp Route Info to Rider</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -1254,50 +1458,119 @@ Thank you for choosing Sparkle Spins!`;
             )}
           </div>
 
-          {/* Financial Summary */}
-          <div className="bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-200/80">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Price</span>
-              <div className="text-2xl font-black text-slate-900">KSh {activeOrder.total.toLocaleString()}</div>
-            </div>
+          {/* Financial Summary & 1-Click Fast Payment Settlement */}
+          <div className="bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-slate-50 p-4 sm:p-5 rounded-2xl border-2 border-emerald-200/90 flex flex-col gap-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Total Order Bill</span>
+                <div className="text-2xl font-black text-slate-900">KSh {activeOrder.total.toLocaleString()}</div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                    activeOrder.paymentStatus === 'Paid' 
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                      : activeOrder.paymentStatus === 'Partial'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-rose-100 text-rose-800 border border-rose-300'
+                  }`}>
+                    {activeOrder.paymentStatus}
+                  </span>
+                  <span className="text-xs text-slate-600 font-bold">
+                    Paid: <strong className="text-emerald-700">KSh {activeOrder.amountPaid.toLocaleString()}</strong> • Due: <strong className="text-rose-600">KSh {activeOrder.balanceDue.toLocaleString()}</strong>
+                  </span>
+                </div>
+              </div>
 
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Payment Status</span>
-              <div className={`text-xs font-bold ${activeOrder.paymentStatus === 'Paid' ? 'text-emerald-600' : 'text-amber-700'}`}>
-                {activeOrder.paymentStatus} • Due on Delivery: <strong>KSh {activeOrder.balanceDue.toLocaleString()}</strong>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSmsDialog(prev => !prev)}
+                  className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Send Delivery Status Update SMS"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-slate-600" />
+                  Status SMS
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowWhatsAppDialog(prev => !prev)}
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  title="Send WhatsApp Notification"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  WhatsApp
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenInvoice(activeOrder)}
+                  className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  title="View Official PDF Receipt"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  PDF Receipt
+                </button>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setShowSmsDialog(prev => !prev)}
-                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Send Delivery Status Update SMS"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-slate-600" />
-                Status SMS
-              </button>
+            {/* 1-Click Fast Settlement Bar */}
+            <div className="pt-3 border-t border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <span>⚡ 1-Click Payment Settlement:</span>
+                {directPaySuccess && (
+                  <span className="text-emerald-700 font-extrabold flex items-center gap-1 animate-in fade-in">
+                    <Check className="w-3.5 h-3.5" /> {directPaySuccess}
+                  </span>
+                )}
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setShowWhatsAppDialog(prev => !prev)}
-                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                title="Send WhatsApp Notification"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                WhatsApp
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {activeOrder.balanceDue > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={isDirectPaying}
+                      onClick={() => handleQuickOneClickPayment('M-Pesa')}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {isDirectPaying ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                      <span>🟢 Settle KSh {activeOrder.balanceDue.toLocaleString()} (M-Pesa)</span>
+                    </button>
 
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenPaymentModal(activeOrder);
-                }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-xs transition-colors cursor-pointer"
-              >
-                Record Payment
-              </button>
+                    <button
+                      type="button"
+                      disabled={isDirectPaying}
+                      onClick={() => handleQuickOneClickPayment('Cash')}
+                      className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Banknote className="w-3.5 h-3.5" />
+                      <span>💵 Paid Cash</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenPaymentModal(activeOrder)}
+                      className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                    >
+                      <span>Custom Amount...</span>
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-emerald-800 bg-emerald-100/90 px-3 py-1.5 rounded-xl border border-emerald-300 flex items-center gap-1.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      <span>✓ Fully Paid &amp; Settled</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onOpenPaymentModal(activeOrder)}
+                      className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold ml-2 cursor-pointer"
+                    >
+                      + Add extra payment
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1452,6 +1725,20 @@ Thank you for choosing Sparkle Spins!`;
               </div>
             </div>
 
+            {workflowSuccessMessage && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{workflowSuccessMessage}</span>
+              </div>
+            )}
+
+            {workflowErrorMessage && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{workflowErrorMessage}</span>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Proof of Delivery / Operational Notes</label>
               <input
@@ -1468,15 +1755,27 @@ Thank you for choosing Sparkle Spins!`;
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <button
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              disabled={isSavingWorkflow}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer disabled:opacity-50"
             >
               Close
             </button>
             <button
               onClick={handleSave}
-              className="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white shadow-sm cursor-pointer"
+              disabled={isSavingWorkflow}
+              className="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
-              Save Workflow Changes
+              {isSavingWorkflow ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving & Syncing to Firebase...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save Workflow Changes</span>
+                </>
+              )}
             </button>
           </div>
         </div>

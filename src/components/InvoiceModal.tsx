@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Order } from "../types";
 import { Printer, Download, CheckCircle2, FileText, Mail, Send, Check } from "lucide-react";
+import { SparkleSpinsLogo } from "./Logo";
 
 interface InvoiceModalProps {
   order: Order;
@@ -59,13 +60,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
         {/* Top actions bar (hidden during print) */}
         <div className="flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-slate-100 print:hidden">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
-              🧺
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900">Invoice #{order.orderNumber}</h3>
-              <p className="text-xs text-slate-500">Generated for {order.customerName}</p>
-            </div>
+            <SparkleSpinsLogo size="sm" variant="dark" tagline={`Order #${order.orderNumber} • ${order.customerName}`} />
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -108,12 +103,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
           {/* Header */}
           <div className="flex justify-between items-start">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl">✨</span>
-                <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Sparkle Spins</h1>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">Professional Laundry, Dry Cleaning & Ironing</p>
-              <p className="text-xs text-slate-500">hello@sparklespins.co.ke • +254 700 123456</p>
+              <SparkleSpinsLogo size="md" variant="dark" tagline="Professional Laundry, Dry Cleaning & Ironing" />
+              <p className="text-xs text-slate-500 mt-2">hello@sparklespins.co.ke • +254 700 123456</p>
             </div>
             <div className="text-right">
               <div className="text-lg font-bold text-indigo-600">INVOICE</div>

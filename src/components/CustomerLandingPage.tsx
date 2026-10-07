@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Order, ServiceItem, Review } from '../types';
 import GhostFibers from './GhostFibers';
-import { Sparkles, Star, ArrowRight, ChevronRight, User, LogIn, MapPin, Phone, Mail, CheckCircle2, Truck, Clock, ShieldCheck, HeartHandshake, MessageSquare, Send } from 'lucide-react';
+import { SparkleSpinsLogo } from './Logo';
+import { Star, ArrowRight, ChevronRight, User, LogIn, MapPin, Phone, Mail, CheckCircle2, Truck, Clock, ShieldCheck, HeartHandshake, MessageSquare, Send, Calendar } from 'lucide-react';
 import { GeminiChatbot } from './GeminiChatbot';
 
 interface CustomerLandingPageProps {
@@ -135,17 +136,7 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
         {/* Top Navigation */}
         <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto w-full">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600/90 backdrop-blur-md flex items-center justify-center shadow-lg shadow-indigo-600/30 border border-indigo-400/30">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">
-                Sparkle Spins
-              </span>
-              <span className="block text-[10px] text-indigo-300 font-medium tracking-widest uppercase">
-                Premium Laundry Co.
-              </span>
-            </div>
+            <SparkleSpinsLogo size="md" variant="light" tagline="Premium Laundry & Garment Logistics" />
           </div>
 
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
@@ -224,7 +215,7 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
 
             <div className="text-center max-w-2xl mx-auto mb-10 space-y-3">
               <div className="inline-flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 text-xs font-semibold px-3.5 py-1 rounded-full border border-indigo-500/30">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
                 Instant Pickup Scheduler
               </div>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Schedule Your Free Pickup</h2>
@@ -408,7 +399,7 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
                   disabled={submittingOrder}
                   className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-base transition-all shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50"
                 >
-                  <Sparkles className="w-5 h-5" />
+                  <Truck className="w-5 h-5" />
                   <span>{submittingOrder ? "Scheduling Pickup..." : "Confirm & Schedule Free Pickup"}</span>
                 </button>
               </form>
@@ -589,20 +580,17 @@ export const CustomerLandingPage: React.FC<CustomerLandingPageProps> = ({
         <footer className="border-t border-slate-900 bg-slate-950/80 backdrop-blur-md py-12 px-6 mt-auto">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-sm text-slate-400">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <span className="font-bold text-white">Sparkle Spins Laundry Co.</span>
+              <SparkleSpinsLogo size="sm" variant="light" tagline="PCEA Tumutumu & Karatina Operations" />
             </div>
 
             <div className="flex items-center gap-6">
-              <button onClick={onOpenLogin} className="hover:text-white transition-colors cursor-pointer">
-                Staff / Admin Login
+              <button onClick={onOpenLogin} className="hover:text-white transition-colors cursor-pointer font-medium">
+                Staff / Admin Portal
               </button>
             </div>
 
             <div className="text-xs text-slate-600">
-              © {new Date().getFullYear()} Sparkle Spins. All rights reserved.
+              © {new Date().getFullYear()} Sparkle Spins. Professional Garment & Laundry Logistics.
             </div>
           </div>
         </footer>

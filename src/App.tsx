@@ -11,6 +11,7 @@ import {
   computeReports
 } from "./initialData";
 import { Dashboard } from "./components/Dashboard";
+import { SparkleSpinsLogo } from "./components/Logo";
 import { OrdersView } from "./components/OrdersView";
 import { CustomersView } from "./components/CustomersView";
 import { FinancialsView } from "./components/FinancialsView";
@@ -822,15 +823,7 @@ export default function App() {
       <header className="bg-white/80 backdrop-blur-md border-b border-sky-100 sticky top-0 z-30 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-lg font-bold shadow-lg shadow-blue-200">
-              ✨
-            </div>
-            <div>
-              <span className="font-bold text-slate-900 text-xl tracking-tight">Sparkle <span className="text-blue-600">Spins</span></span>
-              <span className="text-xs text-blue-600 font-semibold ml-2 bg-blue-50 px-2.5 py-0.5 rounded-full hidden sm:inline-block">
-                Doorstep Laundry Care
-              </span>
-            </div>
+            <SparkleSpinsLogo size="md" variant="dark" tagline="Doorstep Laundry & Garment Logistics" />
           </div>
 
           {/* Navigation Tabs (Admin View) */}

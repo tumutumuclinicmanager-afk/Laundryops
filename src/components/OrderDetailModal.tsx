@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Order, Driver, OrderStatus, ServiceItem, OrderItem } from "../types";
 import { generateWhatsAppMessage, openWhatsAppChat } from "../utils/whatsapp";
+import { SparkleSpinsLogo } from "./Logo";
 import {
   generateOrderConfirmationEmail,
   generateStatusUpdateEmail,
@@ -563,9 +564,7 @@ Thank you for choosing Sparkle Spins!`;
         {/* Modal Top Bar */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-500/20">
-              ✨
-            </div>
+            <SparkleSpinsLogo size="md" variant="dark" showText={false} />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-black text-slate-900">Order {order.orderNumber}</h2>

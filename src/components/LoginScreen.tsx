@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Lock, User, Shield, Truck, Sparkles, CheckCircle2, ArrowLeft, ShoppingBag, Eye, EyeOff } from "lucide-react";
+import { Lock, User, Shield, Truck, CheckCircle2, ArrowLeft, ShoppingBag, Eye, EyeOff } from "lucide-react";
 import GhostFibers from "./GhostFibers";
+import { SparkleSpinsLogo } from "./Logo";
 
 interface LoginScreenProps {
   onLoginSuccess: (user: { role: 'admin' | 'driver'; username: string; name: string; driverId?: string }) => void;
@@ -118,12 +119,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, driver
       )}
 
       <div className="relative w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 space-y-6">
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/30 text-white">
-            <Truck className="w-7 h-7" />
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Sparkle Spins Portal</h1>
-          <p className="text-xs text-slate-500 font-medium">Logistics & Garment Care Management System</p>
+        <div className="text-center flex flex-col items-center space-y-2">
+          <SparkleSpinsLogo size="lg" variant="dark" tagline="Operations & Logistics Portal" className="justify-center" />
         </div>
 
         {/* Role Toggle */}
